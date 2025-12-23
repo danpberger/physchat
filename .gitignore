@@ -9,6 +9,7 @@ node_modules/
 wrangler.toml
 config.local.js
 extension/config.local.js
+LOCAL_SETUP.md
 
 # Tokens and credentials
 tokens.json
