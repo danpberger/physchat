@@ -1,8 +1,10 @@
 // PhysChat Popup Script
 
-// CONFIGURE: Set your Cloudflare Worker URL here
+// Configuration - uses config.local.js if present, otherwise placeholder
 const CONFIG = {
-  workerUrl: 'https://YOUR_WORKER_NAME.YOUR_SUBDOMAIN.workers.dev'
+  workerUrl: (typeof PHYSCHAT_CONFIG !== 'undefined' && PHYSCHAT_CONFIG.workerUrl)
+    ? PHYSCHAT_CONFIG.workerUrl
+    : 'https://YOUR_WORKER_NAME.YOUR_SUBDOMAIN.workers.dev'
 };
 
 document.addEventListener('DOMContentLoaded', () => {

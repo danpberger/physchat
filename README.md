@@ -61,24 +61,26 @@ PhysChat/
    https://physchat-worker.YOUR_SUBDOMAIN.workers.dev
    ```
 
-### 2. Update Extension Configuration
+### 2. Configure Local Settings
 
-After deploying the worker, update the worker URL in these files:
+After deploying the worker, create local config files (these are gitignored):
 
-1. `extension/content.js` - Line 9:
+1. **For the test page** - Copy `config.local.example.js` to `config.local.js`:
    ```javascript
-   workerUrl: 'https://physchat-worker.YOUR_SUBDOMAIN.workers.dev'
+   const PHYSCHAT_CONFIG = {
+     workerUrl: 'https://physchat-worker.YOUR_SUBDOMAIN.workers.dev',
+     devToken: ''  // Optional: paste token here for dev testing
+   };
    ```
 
-2. `extension/background.js` - Line 5:
+2. **For the extension** - Copy `extension/config.local.example.js` to `extension/config.local.js`:
    ```javascript
-   workerUrl: 'https://physchat-worker.YOUR_SUBDOMAIN.workers.dev'
+   const PHYSCHAT_CONFIG = {
+     workerUrl: 'https://physchat-worker.YOUR_SUBDOMAIN.workers.dev'
+   };
    ```
 
-3. `extension/popup.js` - Line 4:
-   ```javascript
-   workerUrl: 'https://physchat-worker.YOUR_SUBDOMAIN.workers.dev'
-   ```
+These config files are automatically loaded by the extension and test page. The `.gitignore` ensures they are never committed.
 
 ### 3. Create Extension Icons
 

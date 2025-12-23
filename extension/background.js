@@ -1,9 +1,18 @@
 // PhysChat Background Service Worker
 // Handles authentication callbacks and manages extension state
 
-// CONFIGURE: Set your Cloudflare Worker URL here
+// Try to load config.local.js (gitignored)
+try {
+  importScripts('config.local.js');
+} catch (e) {
+  // config.local.js not found - using defaults
+}
+
+// Configuration - uses config.local.js if present, otherwise placeholder
 const CONFIG = {
-  workerUrl: 'https://YOUR_WORKER_NAME.YOUR_SUBDOMAIN.workers.dev'
+  workerUrl: (typeof PHYSCHAT_CONFIG !== 'undefined' && PHYSCHAT_CONFIG.workerUrl)
+    ? PHYSCHAT_CONFIG.workerUrl
+    : 'https://YOUR_WORKER_NAME.YOUR_SUBDOMAIN.workers.dev'
 };
 
 // Listen for messages from content script or popup

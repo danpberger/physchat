@@ -809,12 +809,17 @@
     </div>
   </div>
 
+  <!-- Load local config (gitignored) - copy config.local.example.js to config.local.js -->
+  <script src="config.local.js" onerror="console.log('No config.local.js found - using defaults')"></script>
+
   <script>
     // ============================================
     // CONFIGURATION
     // ============================================
-    // CONFIGURE: Set your Cloudflare Worker URL here
-    const WORKER_URL = 'https://YOUR_WORKER_NAME.YOUR_SUBDOMAIN.workers.dev';
+    // Uses config.local.js if present, otherwise placeholder
+    const WORKER_URL = (typeof PHYSCHAT_CONFIG !== 'undefined' && PHYSCHAT_CONFIG.workerUrl)
+      ? PHYSCHAT_CONFIG.workerUrl
+      : 'https://YOUR_WORKER_NAME.YOUR_SUBDOMAIN.workers.dev';
 
     // ============================================
     // STATE
