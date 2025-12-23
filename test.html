@@ -1,0 +1,1907 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PhysChat - AI-Assisted Physics Article Search</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 380px; /* Browser extension sidebar width */
+      margin: 0 auto;
+      padding: 12px;
+      background: #f5f7fa;
+    }
+    h1 { color: #00274c; margin-bottom: 4px; font-size: 24px; }
+    .subtitle { color: #666; margin-bottom: 16px; font-size: 13px; }
+
+    .search-box {
+      background: white;
+      padding: 16px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,39,76,0.1);
+      margin-bottom: 16px;
+    }
+    label { font-weight: 500; color: #333; display: block; margin-bottom: 6px; font-size: 13px; }
+    .token-section {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    .token-section.collapsed textarea { display: none; }
+    .token-toggle {
+      font-size: 12px;
+      color: #0077b6;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+    textarea {
+      width: 100%;
+      height: 50px;
+      font-family: monospace;
+      font-size: 10px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin-top: 6px;
+    }
+    .token-info { font-size: 11px; color: #666; margin-top: 4px; }
+
+    .search-row {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .search-input-wrapper { width: 100%; }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid #e1e5eb;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+    .search-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .search-actions select {
+      padding: 10px 12px;
+      flex-shrink: 0;
+    }
+    .search-actions button {
+      flex: 1;
+      padding: 10px 16px;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #0077b6;
+    }
+    input[type="text"]::placeholder { color: #999; }
+    button {
+      padding: 14px 28px;
+      background: #00274c;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    button:hover { background: #0077b6; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    select {
+      padding: 12px 14px;
+      border: 2px solid #e1e5eb;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      cursor: pointer;
+    }
+    select:focus { outline: none; border-color: #0077b6; }
+
+    .ai-toggle {
+      margin-top: 10px;
+    }
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #666;
+    }
+    .toggle-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    .ai-badge {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .toggle-label:has(input:not(:checked)) .ai-badge {
+      background: #ccc;
+    }
+
+    .example-queries {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #666;
+      line-height: 1.6;
+    }
+    .example-queries span {
+      color: #0077b6;
+      cursor: pointer;
+      display: inline-block;
+      margin-right: 8px;
+      margin-bottom: 2px;
+    }
+    .example-queries span:hover { text-decoration: underline; }
+
+    /* Thinking Panel */
+    .thinking-panel {
+      background: #0f172a;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+      max-width: 100%;
+    }
+    .thinking-header {
+      background: #1e293b;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .thinking-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .thinking-title h3 {
+      margin: 0;
+      font-size: 14px;
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+    .status-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #475569;
+    }
+    .status-indicator.active {
+      background: #22c55e;
+      animation: pulse 1.5s infinite;
+    }
+    .status-indicator.complete { background: #3b82f6; }
+    .status-indicator.error { background: #ef4444; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    }
+    .thinking-controls {
+      display: flex;
+      gap: 8px;
+    }
+    .thinking-btn {
+      background: transparent;
+      border: 1px solid #475569;
+      color: #94a3b8;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .thinking-btn:hover { border-color: #64748b; color: #e2e8f0; background: #334155; }
+
+    .thinking-content {
+      max-height: 350px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .thinking-content.collapsed { max-height: 0; }
+
+    .thinking-stage {
+      border-bottom: 1px solid #1e293b;
+      padding: 8px 12px;
+    }
+    .thinking-stage:last-child { border-bottom: none; }
+    .stage-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .stage-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .stage-icon.analyze { background: #7c3aed; color: white; }
+    .stage-icon.search { background: #0ea5e9; color: white; }
+    .stage-icon.expand { background: #f59e0b; color: white; }
+    .stage-icon.synthesize { background: #10b981; color: white; }
+    .stage-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .stage-status {
+      margin-left: auto;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .stage-status.done { color: #22c55e; }
+    .stage-log {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      color: #94a3b8;
+      padding-left: 34px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .log-line {
+      margin-bottom: 2px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .log-line .label { color: #64748b; }
+    .log-line .value { color: #e2e8f0; }
+    .log-line .highlight { color: #fbbf24; }
+    .log-line .success { color: #22c55e; }
+    .log-line .info { color: #60a5fa; }
+    .log-line .concept {
+      background: #1e3a5f;
+      color: #7dd3fc;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 11px;
+      margin-right: 4px;
+    }
+
+    /* Synthesis Panel */
+    .synthesis-panel {
+      background: linear-gradient(135deg, #00274c 0%, #003366 100%);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      color: white;
+    }
+    .synthesis-panel h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .synthesis-summary {
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .synthesis-insights {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    .insight-card {
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .insight-card h4 {
+      margin: 0 0 4px 0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.8;
+    }
+    .insight-card .value {
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .theme-tag {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      margin: 1px;
+    }
+
+    /* Results */
+    .results-header {
+      background: white;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .results-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .results-header h2 { margin: 0; color: #00274c; font-size: 16px; }
+    .results-count { color: #666; font-size: 12px; }
+    .results-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .results-controls label {
+      font-size: 12px;
+      color: #666;
+    }
+    .results-controls select {
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      flex: 1;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #666;
+    }
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #e1e5eb;
+      border-top-color: #00274c;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-message {
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    /* Article Card - Compact for sidebar */
+    .article-card {
+      background: white;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 4px rgba(0,39,76,0.08);
+      border-left: 3px solid #00274c;
+      position: relative;
+    }
+    .article-card:hover {
+      box-shadow: 0 2px 8px rgba(0,39,76,0.12);
+    }
+    .article-card.relevant-high { border-left-color: #22c55e; }
+    .article-card.relevant-medium { border-left-color: #f59e0b; }
+
+    .article-rank {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: #f1f5f9;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+    .match-badge {
+      position: absolute;
+      top: 8px;
+      right: 42px;
+      background: #22c55e;
+      color: white;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: help;
+    }
+
+    .article-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #00274c;
+      margin: 0 0 6px 0;
+      line-height: 1.3;
+      padding-right: 36px;
+    }
+    .article-title a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .article-title a:hover {
+      color: #0077b6;
+      text-decoration: underline;
+    }
+
+    .article-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    .article-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      color: #666;
+    }
+    .journal-badge {
+      background: #00274c;
+      color: white;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 500;
+      font-size: 10px;
+    }
+
+    .article-authors {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .article-summary {
+      font-size: 12px;
+      color: #444;
+      line-height: 1.5;
+      margin-bottom: 6px;
+      padding: 8px;
+      background: #f8f9fa;
+      border-radius: 4px;
+      position: relative;
+    }
+    .article-summary.ai-generated {
+      background: linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 100%);
+      border: 1px solid #e0e7ff;
+    }
+    .ai-summary-badge {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .summary-loading {
+      opacity: 0.7;
+    }
+
+    .article-concepts {
+      margin-bottom: 6px;
+    }
+    .concept-tag {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 10px;
+      margin-right: 4px;
+      margin-bottom: 3px;
+    }
+
+    .article-doi {
+      font-size: 11px;
+      color: #666;
+    }
+    .article-doi a {
+      color: #0077b6;
+      text-decoration: none;
+    }
+    .article-doi a:hover { text-decoration: underline; }
+
+    .no-results {
+      text-align: center;
+      padding: 60px;
+      color: #666;
+      background: white;
+      border-radius: 12px;
+    }
+
+    /* How It Works Link */
+    .how-it-works-link {
+      color: #94a3b8;
+      font-size: 11px;
+      text-decoration: none;
+      margin-right: 8px;
+    }
+    .how-it-works-link:hover {
+      color: #e2e8f0;
+      text-decoration: underline;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .modal-overlay.active {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      position: relative;
+      margin: 20px auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    .modal-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #666;
+      cursor: pointer;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+    .modal-close:hover {
+      color: #333;
+    }
+    .modal-content h2 {
+      color: #00274c;
+      margin: 0 0 4px 0;
+      font-size: 20px;
+    }
+    .modal-subtitle {
+      color: #666;
+      font-size: 13px;
+      margin: 0 0 20px 0;
+    }
+    .modal-section {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #eee;
+    }
+    .modal-section:last-of-type {
+      border-bottom: none;
+    }
+    .modal-section h3 {
+      color: #00274c;
+      font-size: 14px;
+      margin: 0 0 8px 0;
+    }
+    .modal-section p {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #444;
+      margin: 0 0 8px 0;
+    }
+    .modal-section ul {
+      margin: 8px 0;
+      padding-left: 20px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #444;
+    }
+    .modal-section li {
+      margin-bottom: 4px;
+    }
+    .formula-box {
+      background: #f8f9fa;
+      border: 1px solid #e1e5eb;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 10px 0;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 12px;
+      color: #00274c;
+    }
+    .example-badge {
+      background: #22c55e;
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .example-ai-badge {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .journal-list {
+      column-count: 2;
+      column-gap: 20px;
+    }
+    .modal-footer {
+      background: #f8f9fa;
+      margin: 16px -24px -24px;
+      padding: 14px 24px;
+      border-radius: 0 0 12px 12px;
+    }
+    .modal-footer p {
+      margin: 0;
+      font-size: 12px;
+      color: #666;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <h1>PhysChat</h1>
+  <p class="subtitle">AI-Assisted Physics Article Search powered by APS Tesseract</p>
+
+  <div class="search-box">
+    <div class="token-section collapsed" id="tokenSection">
+      <label>
+        Access Token
+        <span class="token-toggle" onclick="toggleToken()">[show]</span>
+      </label>
+      <textarea id="token"></textarea>
+      <p class="token-info">Token length: <span id="tokenLen"></span></p>
+    </div>
+
+    <label>What do you want to know?</label>
+    <div class="search-row">
+      <div class="search-input-wrapper">
+        <input type="text" id="query" placeholder="Ask a question about physics research..." />
+      </div>
+      <div class="search-actions">
+        <select id="sortOrder" title="Sort order">
+          <option value="relevance">Relevance</option>
+          <option value="recent">Most Recent</option>
+        </select>
+        <button onclick="executeSearch()" id="searchBtn">Search</button>
+      </div>
+    </div>
+    <div class="ai-toggle">
+      <label class="toggle-label">
+        <input type="checkbox" id="useAI" checked />
+        <span class="toggle-text">Use Claude AI for query parsing</span>
+        <span class="ai-badge">AI</span>
+      </label>
+    </div>
+    <div class="example-queries">
+      Try:
+      <span onclick="setQuery('What causes high-temperature superconductivity?')">What causes high-temperature superconductivity?</span>
+      <span onclick="setQuery('quantum entanglement experiments 2024')">quantum entanglement experiments 2024</span>
+      <span onclick="setQuery('How do topological insulators work?')">How do topological insulators work?</span>
+    </div>
+  </div>
+
+  <!-- Thinking Panel -->
+  <div class="thinking-panel" id="thinkingPanel">
+    <div class="thinking-header">
+      <div class="thinking-title">
+        <div class="status-indicator" id="statusIndicator"></div>
+        <h3>Search Process</h3>
+      </div>
+      <div class="thinking-controls">
+        <a href="#" class="how-it-works-link" onclick="openHowItWorks(event)">How this works</a>
+        <button class="thinking-btn" onclick="clearThinking()">Clear</button>
+        <button class="thinking-btn" onclick="toggleThinking()" id="toggleBtn">Collapse</button>
+      </div>
+    </div>
+    <div class="thinking-content" id="thinkingContent">
+      <div id="thinkingStages"></div>
+    </div>
+  </div>
+
+  <!-- Synthesis Panel (hidden until search completes) -->
+  <div class="synthesis-panel" id="synthesisPanel" style="display: none;"></div>
+
+  <!-- Results -->
+  <div id="results"></div>
+
+  <!-- How It Works Modal -->
+  <div class="modal-overlay" id="howItWorksModal" onclick="closeHowItWorks(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeHowItWorks()">&times;</button>
+      <h2>How PhysChat Search Works</h2>
+      <p class="modal-subtitle">Transparent AI-assisted search for physics research</p>
+
+      <div class="modal-section">
+        <h3>1. Query Analysis</h3>
+        <p>When you enter a question or search terms, Claude AI (Haiku model) analyzes your query to:</p>
+        <ul>
+          <li>Identify core physics concepts (e.g., "quantum mechanics", "superconductivity")</li>
+          <li>Recognize compound terms that should stay together</li>
+          <li>Understand your intent (explanation, recent research, review articles, etc.)</li>
+          <li>Generate a multi-search strategy tailored to your question</li>
+        </ul>
+      </div>
+
+      <div class="modal-section">
+        <h3>2. Multi-Search Strategy</h3>
+        <p>Instead of a single search, PhysChat runs <strong>multiple targeted searches</strong> against the APS Tesseract database:</p>
+        <ul>
+          <li><strong>Intersection searches</strong> (weight: 2.0) &mdash; combining concepts to find articles at their intersection</li>
+          <li><strong>Concept searches</strong> (weight: 1.0-1.5) &mdash; individual topic searches</li>
+          <li><strong>Review searches</strong> (weight: 1.2) &mdash; for explanatory questions, finds review articles</li>
+        </ul>
+        <p>Each search has a <em>weight</em> indicating its expected relevance to your query.</p>
+      </div>
+
+      <div class="modal-section">
+        <h3>3. Overlap Analysis & Ranking</h3>
+        <p>The key insight: <strong>articles appearing in multiple searches are more likely relevant</strong>.</p>
+        <p>For each article, we calculate:</p>
+        <div class="formula-box">
+          <code>relevanceScore = totalWeight + (overlapCount - 1) × 1.5</code>
+        </div>
+        <ul>
+          <li><strong>totalWeight</strong>: Sum of (search weight × position factor) across all searches finding this article</li>
+          <li><strong>overlapBonus</strong>: +1.5 points for each additional search that finds the same article</li>
+        </ul>
+        <p>Articles found in 2+ searches get a <span class="example-badge">2× match</span> badge and green highlight.</p>
+      </div>
+
+      <div class="modal-section">
+        <h3>4. AI Summaries</h3>
+        <p>The top 5 articles receive AI-generated summaries from Claude Haiku, providing concise 1-2 sentence descriptions of each paper's key findings. These are marked with an <span class="example-ai-badge">AI</span> badge.</p>
+      </div>
+
+      <div class="modal-section">
+        <h3>5. Data Sources</h3>
+        <p>All article data comes from the <strong>APS Tesseract API</strong>, which indexes articles from American Physical Society journals including:</p>
+        <ul class="journal-list">
+          <li>Physical Review Letters</li>
+          <li>Physical Review X</li>
+          <li>Physical Review A-E</li>
+          <li>Reviews of Modern Physics</li>
+          <li>PRX Quantum, PRX Energy, PRX Life</li>
+        </ul>
+      </div>
+
+      <div class="modal-section">
+        <h3>Why Transparency Matters</h3>
+        <p>PhysChat is designed with <strong>open science principles</strong> in mind. By showing you exactly how searches are constructed and results are ranked, you can:</p>
+        <ul>
+          <li>Understand why certain articles appear at the top</li>
+          <li>Identify potential gaps in search coverage</li>
+          <li>Make informed decisions about which results to explore</li>
+          <li>Trust but verify the AI's interpretation of your query</li>
+        </ul>
+      </div>
+
+      <div class="modal-footer">
+        <p>PhysChat is a proof-of-concept tool. Search results should be verified against primary sources.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // CONFIGURATION
+    // ============================================
+    // CONFIGURE: Set your Cloudflare Worker URL here
+    const WORKER_URL = 'https://YOUR_WORKER_NAME.YOUR_SUBDOMAIN.workers.dev';
+
+    // ============================================
+    // STATE
+    // ============================================
+    let thinkingExpanded = true;
+    let currentSearch = null;
+    let currentResults = [];  // Store results for re-sorting
+    let currentTotalFound = 0;
+    let currentAnalysis = null;
+
+    // Physics domain keywords for detection
+    const PHYSICS_DOMAINS = {
+      'quantum': ['quantum', 'qubit', 'entanglement', 'superposition', 'coherence', 'decoherence', 'wavefunction'],
+      'particle': ['particle', 'hadron', 'lepton', 'quark', 'boson', 'fermion', 'higgs', 'neutrino', 'muon', 'collider'],
+      'condensed matter': ['superconductor', 'semiconductor', 'topological', 'insulator', 'magnetic', 'ferromagnetic', 'lattice', 'phonon', 'band gap'],
+      'astrophysics': ['black hole', 'neutron star', 'galaxy', 'cosmic', 'gravitational wave', 'dark matter', 'dark energy', 'pulsar'],
+      'optics': ['photon', 'laser', 'optical', 'light', 'photonic', 'waveguide', 'nonlinear optics'],
+      'atomic': ['atom', 'atomic', 'bose-einstein', 'ultracold', 'ion trap', 'optical lattice'],
+      'nuclear': ['nuclear', 'fission', 'fusion', 'radioactive', 'isotope', 'decay'],
+      'thermodynamics': ['entropy', 'thermodynamic', 'heat', 'temperature', 'phase transition']
+    };
+
+    // Query intent patterns
+    const INTENT_PATTERNS = {
+      'explanation': [/^what (is|are|causes|makes)/i, /^how (do|does|is|are|can)/i, /^why (do|does|is|are)/i, /explain/i],
+      'recent': [/recent/i, /latest/i, /new/i, /2024/i, /2023/i, /current/i],
+      'review': [/review/i, /overview/i, /survey/i, /state of/i],
+      'experimental': [/experiment/i, /measure/i, /observation/i, /detection/i, /evidence/i],
+      'theoretical': [/theory/i, /theoretical/i, /model/i, /predict/i, /calculation/i],
+      'comparison': [/compare/i, /versus/i, /vs/i, /difference between/i, /better than/i]
+    };
+
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    document.getElementById('tokenLen').textContent = document.getElementById('token').value.trim().length;
+    document.getElementById('token').addEventListener('input', function() {
+      document.getElementById('tokenLen').textContent = this.value.trim().length;
+    });
+    document.getElementById('query').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') executeSearch();
+    });
+
+    // ============================================
+    // UI HELPERS
+    // ============================================
+    function toggleToken() {
+      const section = document.getElementById('tokenSection');
+      const toggle = section.querySelector('.token-toggle');
+      section.classList.toggle('collapsed');
+      toggle.textContent = section.classList.contains('collapsed') ? '[show]' : '[hide]';
+    }
+
+    function toggleThinking() {
+      const content = document.getElementById('thinkingContent');
+      const btn = document.getElementById('toggleBtn');
+      thinkingExpanded = !thinkingExpanded;
+      content.classList.toggle('collapsed', !thinkingExpanded);
+      btn.textContent = thinkingExpanded ? 'Collapse' : 'Expand';
+    }
+
+    function clearThinking() {
+      document.getElementById('thinkingStages').innerHTML = '';
+      setStatus('idle');
+    }
+
+    function openHowItWorks(event) {
+      if (event) event.preventDefault();
+      document.getElementById('howItWorksModal').classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeHowItWorks(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('howItWorksModal').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeHowItWorks();
+      }
+    });
+
+    function setQuery(q) {
+      document.getElementById('query').value = q;
+      document.getElementById('query').focus();
+    }
+
+    function changeSortOrder(newSort) {
+      document.getElementById('sortOrder').value = newSort;
+
+      // Re-sort existing results locally instead of re-searching
+      if (currentResults.length > 0) {
+        const sorted = [...currentResults];
+        if (newSort === 'recent') {
+          sorted.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        } else {
+          // Sort by relevance score (original order preserved via score)
+          sorted.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+        }
+        renderResults(sorted, currentTotalFound, currentAnalysis);
+      }
+    }
+
+    function setStatus(status) {
+      const indicator = document.getElementById('statusIndicator');
+      indicator.className = 'status-indicator';
+      if (status === 'active') indicator.classList.add('active');
+      else if (status === 'complete') indicator.classList.add('complete');
+      else if (status === 'error') indicator.classList.add('error');
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // ============================================
+    // THINKING PANEL
+    // ============================================
+    function addStage(id, icon, title) {
+      const stages = document.getElementById('thinkingStages');
+      const stage = document.createElement('div');
+      stage.className = 'thinking-stage';
+      stage.id = `stage-${id}`;
+      stage.innerHTML = `
+        <div class="stage-header">
+          <div class="stage-icon ${icon}">${getStageEmoji(icon)}</div>
+          <span class="stage-title">${title}</span>
+          <span class="stage-status" id="status-${id}">running...</span>
+        </div>
+        <div class="stage-log" id="log-${id}"></div>
+      `;
+      stages.appendChild(stage);
+      scrollThinking();
+      return id;
+    }
+
+    function getStageEmoji(icon) {
+      const emojis = { analyze: '🔍', search: '📡', expand: '🌐', synthesize: '✨' };
+      return emojis[icon] || '•';
+    }
+
+    function logToStage(stageId, html) {
+      const log = document.getElementById(`log-${stageId}`);
+      if (log) {
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.innerHTML = html;
+        log.appendChild(line);
+        scrollThinking();
+      }
+    }
+
+    function completeStage(stageId, message = 'done') {
+      const status = document.getElementById(`status-${stageId}`);
+      if (status) {
+        status.textContent = message;
+        status.classList.add('done');
+      }
+    }
+
+    function scrollThinking() {
+      const content = document.getElementById('thinkingContent');
+      content.scrollTop = content.scrollHeight;
+    }
+
+    // ============================================
+    // QUERY ANALYSIS
+    // ============================================
+
+    // Compound physics terms to preserve as phrases
+    const COMPOUND_TERMS = [
+      'quantum mechanics', 'quantum field theory', 'quantum electrodynamics', 'quantum chromodynamics',
+      'quantum computing', 'quantum information', 'quantum entanglement', 'quantum biology',
+      'condensed matter', 'solid state', 'particle physics', 'high energy', 'nuclear physics',
+      'statistical mechanics', 'thermodynamics', 'general relativity', 'special relativity',
+      'string theory', 'dark matter', 'dark energy', 'black hole', 'neutron star', 'gravitational wave',
+      'superconductivity', 'high temperature superconductivity', 'topological insulator',
+      'bose einstein', 'fermi liquid', 'spin glass', 'magnetic resonance', 'nuclear magnetic',
+      'x ray', 'gamma ray', 'cosmic ray', 'standard model', 'higgs boson', 'higgs field',
+      'wave function', 'schrödinger equation', 'dirac equation', 'maxwell equations',
+      'phase transition', 'critical phenomena', 'renormalization group', 'monte carlo',
+      'density functional', 'molecular dynamics', 'band structure', 'fermi surface'
+    ];
+
+    // Extended stop words including conversational language
+    const STOP_WORDS = new Set([
+      // Articles, pronouns, prepositions
+      'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
+      'must', 'shall', 'can', 'need', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
+      'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'and',
+      'but', 'if', 'or', 'because', 'until', 'while', 'what', 'how', 'why', 'when', 'where', 'who',
+      'which', 'that', 'this', 'these', 'those', 'it', 'its', 'they', 'their', 'there',
+      'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours',
+      'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself',
+      // Conversational/request words (NOT physics terms)
+      'want', 'wanted', 'wanting', 'understand', 'understanding', 'understood', 'help', 'helped',
+      'helping', 'please', 'thank', 'thanks', 'explain', 'explained', 'explaining', 'explanation',
+      'tell', 'told', 'telling', 'know', 'knew', 'known', 'knowing', 'learn', 'learned', 'learning',
+      'find', 'found', 'finding', 'look', 'looked', 'looking', 'search', 'searching', 'searched',
+      'show', 'showed', 'showing', 'give', 'gave', 'giving', 'get', 'got', 'getting',
+      'see', 'saw', 'seeing', 'read', 'reading', 'write', 'writing', 'think', 'thinking', 'thought',
+      'like', 'would', 'about', 'some', 'any', 'more', 'most', 'other', 'such', 'only', 'also',
+      'just', 'very', 'really', 'actually', 'basically', 'simply', 'mainly', 'mostly',
+      'relationship', 'related', 'relates', 'relation', 'connection', 'connected', 'between',
+      'difference', 'different', 'differences', 'similar', 'same', 'comparison', 'compare',
+      'work', 'works', 'working', 'worked', 'use', 'used', 'using', 'uses',
+      'make', 'made', 'making', 'makes', 'cause', 'caused', 'causing', 'causes',
+      'thing', 'things', 'something', 'anything', 'everything', 'nothing',
+      'way', 'ways', 'example', 'examples', 'case', 'cases', 'type', 'types', 'kind', 'kinds',
+      'question', 'questions', 'answer', 'answers', 'problem', 'problems', 'solution', 'solutions',
+      'information', 'info', 'detail', 'details', 'topic', 'topics', 'subject', 'subjects',
+      'area', 'areas', 'field', 'fields', 'study', 'studies', 'research', 'paper', 'papers',
+      'article', 'articles', 'book', 'books'
+    ]);
+
+    function extractSearchKeywords(text) {
+      let normalized = text.toLowerCase().replace(/[?.,!'"]/g, ' ').replace(/\s+/g, ' ').trim();
+      const foundCompounds = [];
+
+      // First, find and extract compound terms
+      for (const compound of COMPOUND_TERMS) {
+        if (normalized.includes(compound)) {
+          foundCompounds.push(compound);
+          // Remove the compound from text so individual words aren't double-counted
+          normalized = normalized.replace(new RegExp(compound, 'g'), ' ');
+        }
+      }
+
+      // Extract remaining individual words, filtering stop words
+      const words = normalized.split(/\s+/)
+        .filter(w => w.length > 2 && !STOP_WORDS.has(w))
+        .filter(w => /^[a-z]+$/i.test(w)); // Only alphabetic words
+
+      // Combine compounds and individual words, compounds first
+      const keywords = [...foundCompounds, ...words];
+
+      // Deduplicate while preserving order
+      return [...new Set(keywords)];
+    }
+
+    function analyzeQuery(query) {
+      const analysis = {
+        original: query,
+        normalized: query.toLowerCase().trim(),
+        isQuestion: false,
+        intent: [],
+        domains: [],
+        entities: { years: [], authors: [], journals: [] },
+        keywords: [],
+        searchStrategy: 'keyword',
+        suggestedQueries: []
+      };
+
+      // Detect if it's a question
+      const questionWords = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'can', 'does', 'is', 'are'];
+      analysis.isQuestion = questionWords.some(w => analysis.normalized.startsWith(w + ' ')) ||
+                            analysis.normalized.endsWith('?');
+
+      // Detect intent
+      for (const [intent, patterns] of Object.entries(INTENT_PATTERNS)) {
+        if (patterns.some(p => p.test(analysis.normalized))) {
+          analysis.intent.push(intent);
+        }
+      }
+
+      // Detect physics domains
+      for (const [domain, keywords] of Object.entries(PHYSICS_DOMAINS)) {
+        if (keywords.some(k => analysis.normalized.includes(k))) {
+          analysis.domains.push(domain);
+        }
+      }
+
+      // Extract years
+      const yearMatches = query.match(/\b(19|20)\d{2}\b/g);
+      if (yearMatches) {
+        analysis.entities.years = yearMatches;
+      }
+
+      // Extract keywords with improved filtering
+      analysis.keywords = extractSearchKeywords(analysis.normalized);
+
+      // Determine search strategy
+      if (analysis.intent.includes('recent')) {
+        analysis.searchStrategy = 'recent';
+      } else if (analysis.intent.includes('review')) {
+        analysis.searchStrategy = 'review';
+      } else if (analysis.isQuestion && analysis.intent.includes('explanation')) {
+        analysis.searchStrategy = 'conceptual';
+      }
+
+      // Generate search queries
+      analysis.suggestedQueries = generateSearchQueries(analysis);
+
+      return analysis;
+    }
+
+    function generateSearchQueries(analysis, userSort) {
+      const queries = [];
+      const keywords = analysis.keywords;
+
+      if (keywords.length === 0) {
+        // Fallback: use cleaned original query
+        const cleaned = analysis.original
+          .replace(/[?!]/g, '')
+          .replace(/\b(can you|could you|please|help me|i want to|i'd like to|tell me about|explain)\b/gi, '')
+          .trim();
+        queries.push({
+          query: cleaned,
+          purpose: 'direct query',
+          sort: userSort,
+          weight: 1.0
+        });
+        return queries;
+      }
+
+      // Separate compound terms (multi-word) from single words
+      const compoundTerms = keywords.filter(k => k.includes(' '));
+      const singleWords = keywords.filter(k => !k.includes(' '));
+
+      // Strategy 1: Search each compound term directly (these are known physics phrases)
+      for (const compound of compoundTerms) {
+        queries.push({
+          query: compound,
+          purpose: `"${compound}"`,
+          sort: userSort,
+          weight: 1.5
+        });
+      }
+
+      // Strategy 2: Search each significant single-word concept separately
+      // This lets us find articles focused on each topic
+      const genericTerms = new Set([
+        'physics', 'theory', 'model', 'effect', 'properties', 'behavior', 'study',
+        'application', 'applications', 'method', 'methods', 'analysis', 'system', 'systems',
+        'experiment', 'experiments', 'experimental', 'measurement', 'measurements',
+        'results', 'data', 'observation', 'observations', 'evidence', 'approach',
+        'technique', 'techniques', 'process', 'processes', 'mechanism', 'mechanisms',
+        'structure', 'structures', 'dynamics', 'simulation', 'simulations',
+        'calculation', 'calculations', 'prediction', 'predictions', 'recent', 'new', 'novel'
+      ]);
+      const significantWords = singleWords.filter(w => !genericTerms.has(w));
+
+      for (const word of significantWords.slice(0, 3)) {
+        queries.push({
+          query: word,
+          purpose: `"${word}"`,
+          sort: userSort,
+          weight: 1.0
+        });
+      }
+
+      // Strategy 3: Search combinations of terms together
+      // This finds articles at the intersection of concepts
+      if (keywords.length >= 2) {
+        // Try pairs of keywords (most useful for finding intersection)
+        const allTerms = [...compoundTerms, ...significantWords];
+        if (allTerms.length >= 2) {
+          // Primary combination: first two concepts together
+          const combo = allTerms.slice(0, 2).join(' ');
+          queries.push({
+            query: combo,
+            purpose: `intersection`,
+            sort: userSort,
+            weight: 2.0  // High weight - articles matching both are most relevant
+          });
+
+          // If we have 3+ terms, also try other combinations
+          if (allTerms.length >= 3) {
+            const combo2 = `${allTerms[0]} ${allTerms[2]}`;
+            queries.push({
+              query: combo2,
+              purpose: `intersection`,
+              sort: userSort,
+              weight: 1.8
+            });
+          }
+        }
+      }
+
+      // Strategy 4: If it's a conceptual question, add a review search
+      if (analysis.isQuestion && analysis.intent.includes('explanation')) {
+        const mainConcept = compoundTerms[0] || significantWords[0];
+        if (mainConcept) {
+          queries.push({
+            query: `${mainConcept} review`,
+            purpose: `review articles`,
+            sort: userSort,
+            weight: 1.2
+          });
+        }
+      }
+
+      // Deduplicate queries by search string
+      const seen = new Set();
+      const uniqueQueries = queries.filter(q => {
+        const key = q.query.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // Limit to 5 searches max to keep it fast
+      return uniqueQueries.slice(0, 5);
+    }
+
+    // ============================================
+    // SEARCH EXECUTION
+    // ============================================
+
+    /**
+     * AI-powered search using Claude via the worker
+     */
+    async function executeAISearch(token, query, userSort, resultsEl, synthesisPanel) {
+      // Stage 1: AI Query Analysis
+      const stageAnalyze = addStage('analyze', 'analyze', 'Claude AI Analysis');
+      await sleep(100);
+
+      logToStage('analyze', `<span class="label">Input:</span> <span class="value">"${query}"</span>`);
+      logToStage('analyze', `<span class="label">Processing:</span> <span class="highlight">Sending to Claude Haiku...</span>`);
+
+      // Call the AI search endpoint
+      const results = await performAISearch(token, query, userSort);
+
+      if (results.error) {
+        completeStage('analyze', 'error');
+        throw new Error(results.error);
+      }
+
+      // Show AI interpretation
+      if (results.aiAnalysis) {
+        logToStage('analyze', `<span class="label">Interpretation:</span> <span class="value">${results.aiAnalysis.interpretation}</span>`);
+        await sleep(100);
+
+        if (results.aiAnalysis.concepts && results.aiAnalysis.concepts.length > 0) {
+          logToStage('analyze', `<span class="label">Concepts:</span> ${results.aiAnalysis.concepts.map(c => `<span class="concept">${c}</span>`).join('')}`);
+        }
+        await sleep(100);
+
+        logToStage('analyze', `<span class="label">Search plan:</span> <span class="highlight">${results.aiAnalysis.searchesRun.length} queries</span>`);
+      } else if (results.fallback) {
+        logToStage('analyze', `<span class="label">Note:</span> <span class="info">AI unavailable, used fallback parsing</span>`);
+      }
+
+      completeStage('analyze', 'complete');
+      await sleep(150);
+
+      // Stage 2: Multi-Search Execution
+      const stageSearch = addStage('search', 'search', 'Multi-Search Execution');
+      await sleep(100);
+
+      // Show each search that was executed
+      if (results.aiAnalysis && results.aiAnalysis.searchesRun) {
+        for (const search of results.aiAnalysis.searchesRun) {
+          if (search.error) {
+            logToStage('search', `<span class="label">${search.purpose}:</span> <span style="color:#ef4444">Error - ${search.error}</span>`);
+          } else {
+            logToStage('search', `<span class="label">${search.purpose}:</span> <span class="value">"${search.query}"</span> → <span class="success">${search.totalFound?.toLocaleString() || '?'} found</span> (weight: ${search.weight})`);
+          }
+          await sleep(80);
+        }
+      }
+
+      completeStage('search', 'searches complete');
+      await sleep(150);
+
+      // Stage 3: Overlap Analysis & Ranking
+      const stageRank = addStage('expand', 'expand', 'Overlap Analysis & Ranking');
+      await sleep(100);
+
+      const uniqueResults = results.results || [];
+
+      if (results.ranking && results.ranking.stats) {
+        const stats = results.ranking.stats;
+        logToStage('expand', `<span class="label">Total unique articles:</span> <span class="value">${stats.totalUnique}</span>`);
+        await sleep(80);
+
+        if (stats.inMultipleSearches > 0) {
+          logToStage('expand', `<span class="label">In 2+ searches:</span> <span class="highlight">${stats.inMultipleSearches} articles</span> (boosted relevance)`);
+          await sleep(80);
+        }
+
+        if (stats.in3PlusSearches > 0) {
+          logToStage('expand', `<span class="label">In 3+ searches:</span> <span class="highlight">${stats.in3PlusSearches} articles</span> (highest relevance)`);
+          await sleep(80);
+        }
+
+        logToStage('expand', `<span class="label">Ranking method:</span> <span class="info">weight × position + overlap bonus (${results.ranking.overlapBonus})</span>`);
+        await sleep(80);
+      }
+
+      logToStage('expand', `<span class="label">Final results:</span> <span class="success">Top ${uniqueResults.length} articles</span> by combined score`);
+
+      completeStage('expand', `${uniqueResults.length} ranked`);
+      await sleep(150);
+
+      // Stage 4: Synthesize
+      const stageSynth = addStage('synthesize', 'synthesize', 'Synthesizing Results');
+      await sleep(100);
+
+      // Extract concepts and journals for synthesis
+      const concepts = extractConcepts(uniqueResults);
+      const journalCounts = {};
+      uniqueResults.forEach(r => {
+        if (r.journal) journalCounts[r.journal] = (journalCounts[r.journal] || 0) + 1;
+      });
+      const topJournals = Object.entries(journalCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+      if (concepts.length > 0) {
+        logToStage('synthesize', `<span class="label">Key concepts:</span> ${concepts.slice(0, 6).map(c => `<span class="concept">${c}</span>`).join('')}`);
+        await sleep(80);
+      }
+
+      if (topJournals.length > 0) {
+        logToStage('synthesize', `<span class="label">Top journals:</span> <span class="value">${topJournals.map(([j, c]) => `${j} (${c})`).join(', ')}</span>`);
+        await sleep(80);
+      }
+
+      const analysis = { keywords: results.aiAnalysis?.concepts || [query] };
+      const synthesis = synthesizeResults(uniqueResults, analysis, concepts, topJournals);
+
+      logToStage('synthesize', `<span class="label">Themes:</span> ${synthesis.themes.map(t => `<span class="concept">${t}</span>`).join('')}`);
+
+      completeStage('synthesize', 'complete');
+      setStatus('complete');
+
+      // Render synthesis panel
+      renderSynthesis(synthesis, results.ranking?.stats?.totalUnique || uniqueResults.length);
+
+      // Store results for re-sorting
+      currentResults = uniqueResults;
+      currentTotalFound = results.ranking?.stats?.totalUnique || uniqueResults.length;
+      currentAnalysis = analysis;
+
+      // Render results
+      renderResults(uniqueResults, currentTotalFound, currentAnalysis);
+
+      document.getElementById('searchBtn').disabled = false;
+    }
+
+    async function executeSearch() {
+      const token = document.getElementById('token').value.trim();
+      const query = document.getElementById('query').value.trim();
+      const userSort = document.getElementById('sortOrder').value;
+      const resultsEl = document.getElementById('results');
+      const searchBtn = document.getElementById('searchBtn');
+      const synthesisPanel = document.getElementById('synthesisPanel');
+
+      if (!token) {
+        resultsEl.innerHTML = '<div class="error-message">Please provide an access token</div>';
+        return;
+      }
+      if (!query) {
+        resultsEl.innerHTML = '<div class="error-message">Please enter a search query</div>';
+        return;
+      }
+
+      // Reset UI
+      clearThinking();
+      setStatus('active');
+      searchBtn.disabled = true;
+      synthesisPanel.style.display = 'none';
+      resultsEl.innerHTML = `
+        <div class="loading">
+          <div class="loading-spinner"></div>
+          <div>Searching...</div>
+        </div>
+      `;
+
+      // Check if AI mode is enabled
+      const useAI = document.getElementById('useAI').checked;
+
+      try {
+        if (useAI) {
+          // ============================================
+          // AI-POWERED SEARCH PATH
+          // ============================================
+          await executeAISearch(token, query, userSort, resultsEl, synthesisPanel);
+          return;
+        }
+
+        // ============================================
+        // LOCAL SEARCH PATH (fallback)
+        // ============================================
+
+        // Stage 1: Analyze Query
+        const stageAnalyze = addStage('analyze', 'analyze', 'Analyzing Query');
+        await sleep(100);
+
+        logToStage('analyze', `<span class="label">Input:</span> <span class="value">"${query}"</span>`);
+        await sleep(200);
+
+        const analysis = analyzeQuery(query);
+        // Generate queries with user-selected sort
+        analysis.suggestedQueries = generateSearchQueries(analysis, userSort);
+
+        if (analysis.isQuestion) {
+          logToStage('analyze', `<span class="label">Type:</span> <span class="highlight">Question</span> - will extract key concepts`);
+        } else {
+          logToStage('analyze', `<span class="label">Type:</span> <span class="info">Keyword search</span>`);
+        }
+        await sleep(150);
+
+        if (analysis.domains.length > 0) {
+          logToStage('analyze', `<span class="label">Physics domains:</span> ${analysis.domains.map(d => `<span class="concept">${d}</span>`).join('')}`);
+        }
+        await sleep(150);
+
+        if (analysis.intent.length > 0) {
+          logToStage('analyze', `<span class="label">Search intent:</span> <span class="value">${analysis.intent.join(', ')}</span>`);
+        }
+        await sleep(150);
+
+        logToStage('analyze', `<span class="label">Key terms:</span> <span class="value">${analysis.keywords.join(', ')}</span>`);
+        await sleep(100);
+
+        // Log search strategy
+        logToStage('analyze', `<span class="label">Strategy:</span> <span class="highlight">${analysis.suggestedQueries.length} searches planned</span>, sorted by <span class="info">${userSort}</span>`);
+        for (const sq of analysis.suggestedQueries) {
+          logToStage('analyze', `<span class="label">  →</span> <span class="concept">${sq.purpose}</span>: "${sq.query}" (weight: ${sq.weight})`);
+        }
+
+        completeStage('analyze', 'complete');
+        await sleep(200);
+
+        // Stage 2: Execute Multi-Search Strategy
+        const stageSearch = addStage('search', 'search', 'Executing Multi-Search');
+        await sleep(100);
+
+        // Track results by DOI with overlap scoring
+        const resultsByDoi = new Map(); // DOI -> { article, sources: [], totalWeight: 0 }
+        let totalFound = 0;
+
+        for (let i = 0; i < analysis.suggestedQueries.length; i++) {
+          const sq = analysis.suggestedQueries[i];
+          logToStage('search', `<span class="label">${sq.purpose}:</span> <span class="value">"${sq.query}"</span>`);
+
+          const results = await performSearch(token, sq.query, 15, sq.sort);
+
+          if (results.error) {
+            logToStage('search', `<span class="label">  Error:</span> <span style="color:#ef4444">${results.error}</span>`);
+            if (results.error.includes('expired') || results.error.includes('Unauthorized')) {
+              throw new Error(results.error);
+            }
+          } else {
+            logToStage('search', `<span class="label">  Found:</span> <span class="success">${results.total.toLocaleString()} total</span> (retrieved ${results.results.length})`);
+            totalFound = Math.max(totalFound, results.total);
+
+            // Track each result with its source and weight
+            for (let rank = 0; rank < results.results.length; rank++) {
+              const article = results.results[rank];
+              if (!article.doi) continue;
+
+              if (resultsByDoi.has(article.doi)) {
+                // Article found in multiple searches - boost it!
+                const existing = resultsByDoi.get(article.doi);
+                existing.sources.push(sq.purpose);
+                existing.totalWeight += sq.weight * (1 - rank * 0.03); // Weight decreases with rank
+                existing.overlapCount++;
+              } else {
+                resultsByDoi.set(article.doi, {
+                  article: article,
+                  sources: [sq.purpose],
+                  totalWeight: sq.weight * (1 - rank * 0.03),
+                  overlapCount: 1
+                });
+              }
+            }
+          }
+          await sleep(250);
+        }
+
+        // Log overlap statistics
+        const overlapArticles = [...resultsByDoi.values()].filter(r => r.overlapCount > 1);
+        if (overlapArticles.length > 0) {
+          logToStage('search', `<span class="label">Overlap:</span> <span class="highlight">${overlapArticles.length} articles</span> found in multiple searches (high relevance)`);
+        }
+
+        completeStage('search', `${resultsByDoi.size} unique`);
+        await sleep(200);
+
+        // Stage 3: Rank & Score Results
+        const stageExpand = addStage('expand', 'expand', 'Ranking Results');
+        await sleep(100);
+
+        // Convert Map to array and apply overlap bonus
+        const scoredResults = [...resultsByDoi.values()].map(r => {
+          // Overlap bonus: articles in multiple searches get significant boost
+          const overlapBonus = (r.overlapCount - 1) * 1.5;
+          const finalScore = r.totalWeight + overlapBonus;
+
+          return {
+            ...r.article,
+            sources: r.sources,
+            overlapCount: r.overlapCount,
+            relevanceScore: finalScore
+          };
+        });
+
+        // Sort by relevance score (highest first)
+        scoredResults.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+        // Take top 20
+        const uniqueResults = scoredResults.slice(0, 20);
+
+        logToStage('expand', `<span class="label">Scored:</span> <span class="value">${scoredResults.length} articles</span> by multi-search relevance`);
+
+        // Show top overlap articles
+        const topOverlap = uniqueResults.filter(r => r.overlapCount > 1).slice(0, 3);
+        if (topOverlap.length > 0) {
+          logToStage('expand', `<span class="label">Best matches:</span> Articles appearing in ${topOverlap[0]?.overlapCount || 2}+ searches ranked highest`);
+        }
+        await sleep(150);
+
+        // Extract concepts from results
+        const concepts = extractConcepts(uniqueResults);
+        if (concepts.length > 0) {
+          logToStage('expand', `<span class="label">Key concepts:</span> ${concepts.slice(0, 6).map(c => `<span class="concept">${c}</span>`).join('')}`);
+        }
+        await sleep(150);
+
+        // Analyze journals
+        const journalCounts = {};
+        uniqueResults.forEach(r => {
+          if (r.journal) {
+            journalCounts[r.journal] = (journalCounts[r.journal] || 0) + 1;
+          }
+        });
+        const topJournals = Object.entries(journalCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        if (topJournals.length > 0) {
+          logToStage('expand', `<span class="label">Top journals:</span> <span class="value">${topJournals.map(([j, c]) => `${j} (${c})`).join(', ')}</span>`);
+        }
+
+        completeStage('expand', `top ${uniqueResults.length} ranked`);
+        await sleep(200);
+
+        // Stage 4: Synthesize
+        const stageSynth = addStage('synthesize', 'synthesize', 'Synthesizing Results');
+        await sleep(100);
+
+        const synthesis = synthesizeResults(uniqueResults, analysis, concepts, topJournals);
+
+        logToStage('synthesize', `<span class="label">Summary:</span> <span class="value">${synthesis.themes.length} themes identified</span>`);
+        await sleep(150);
+        logToStage('synthesize', `<span class="label">Themes:</span> ${synthesis.themes.map(t => `<span class="concept">${t}</span>`).join('')}`);
+
+        completeStage('synthesize', 'complete');
+        setStatus('complete');
+
+        // Render synthesis panel
+        renderSynthesis(synthesis, totalFound);
+
+        // Store results for re-sorting
+        currentResults = uniqueResults;
+        currentTotalFound = totalFound;
+        currentAnalysis = analysis;
+
+        // Render results with overlap info
+        renderResults(uniqueResults, totalFound, analysis);
+
+      } catch (error) {
+        setStatus('error');
+        resultsEl.innerHTML = `<div class="error-message">${error.message}</div>`;
+      } finally {
+        searchBtn.disabled = false;
+      }
+    }
+
+    async function performSearch(token, query, limit, sort) {
+      try {
+        const response = await fetch(WORKER_URL + '/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ query, limit, sort })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return { error: data.error || `HTTP ${response.status}`, results: [], total: 0 };
+        }
+
+        return data;
+      } catch (err) {
+        return { error: err.message, results: [], total: 0 };
+      }
+    }
+
+    /**
+     * AI-powered search - sends query to Claude for intelligent parsing
+     */
+    async function performAISearch(token, query, sort) {
+      try {
+        const response = await fetch(WORKER_URL + '/ai-search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ query, limit: 15, sort })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return { error: data.error || `HTTP ${response.status}`, results: [], total: 0 };
+        }
+
+        return data;
+      } catch (err) {
+        return { error: err.message, results: [], total: 0 };
+      }
+    }
+
+    // ============================================
+    // RESULT PROCESSING
+    // ============================================
+    function extractConcepts(results) {
+      const conceptCounts = {};
+      const physicsTerms = new Set([
+        'quantum', 'entanglement', 'superconductor', 'topological', 'magnetic', 'photon',
+        'electron', 'spin', 'lattice', 'phase', 'transition', 'coherence', 'correlation',
+        'scattering', 'spectroscopy', 'resonance', 'oscillation', 'coupling', 'interaction',
+        'symmetry', 'order', 'disorder', 'fluctuation', 'excitation', 'ground state',
+        'fermi', 'bose', 'quasiparticle', 'band', 'gap', 'insulator', 'conductor',
+        'semiconductor', 'nanostructure', 'graphene', 'cavity', 'waveguide'
+      ]);
+
+      results.forEach(r => {
+        const text = ((r.title || '') + ' ' + (r.abstract || '')).toLowerCase();
+        physicsTerms.forEach(term => {
+          if (text.includes(term)) {
+            conceptCounts[term] = (conceptCounts[term] || 0) + 1;
+          }
+        });
+      });
+
+      return Object.entries(conceptCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([term]) => term);
+    }
+
+    function synthesizeResults(results, analysis, concepts, topJournals) {
+      const themes = concepts.slice(0, 5);
+
+      // Generate summary based on what we found
+      let summary = '';
+      if (results.length === 0) {
+        summary = 'No articles were found matching your query. Try broadening your search terms.';
+      } else {
+        const journalPhrase = topJournals.length > 0
+          ? `primarily published in ${topJournals[0][0]}`
+          : 'across various journals';
+
+        if (analysis.isQuestion) {
+          summary = `Found ${results.length} relevant articles addressing "${analysis.original}". `;
+          summary += `The research ${journalPhrase} covers topics including ${themes.slice(0, 3).join(', ')}.`;
+        } else {
+          summary = `Retrieved ${results.length} articles for "${analysis.keywords.join(' ')}". `;
+          summary += `Results span ${journalPhrase} with focus on ${themes.slice(0, 3).join(', ')}.`;
+        }
+      }
+
+      // Identify key authors
+      const authorCounts = {};
+      results.forEach(r => {
+        (r.authors || []).forEach(a => {
+          authorCounts[a] = (authorCounts[a] || 0) + 1;
+        });
+      });
+      const prolificAuthors = Object.entries(authorCounts)
+        .filter(([_, count]) => count > 1)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([name]) => name);
+
+      return {
+        summary,
+        themes,
+        topJournals: topJournals.map(([j]) => j),
+        prolificAuthors,
+        resultCount: results.length
+      };
+    }
+
+    // ============================================
+    // RENDERING
+    // ============================================
+    function renderSynthesis(synthesis, totalFound) {
+      const panel = document.getElementById('synthesisPanel');
+      panel.style.display = 'block';
+
+      panel.innerHTML = `
+        <h3>✨ Search Summary</h3>
+        <div class="synthesis-summary">${synthesis.summary}</div>
+        <div class="synthesis-insights">
+          <div class="insight-card">
+            <h4>Total Available</h4>
+            <div class="value">${totalFound.toLocaleString()} articles</div>
+          </div>
+          <div class="insight-card">
+            <h4>Key Themes</h4>
+            <div class="value">${synthesis.themes.map(t => `<span class="theme-tag">${t}</span>`).join('')}</div>
+          </div>
+          ${synthesis.topJournals.length > 0 ? `
+          <div class="insight-card">
+            <h4>Top Journals</h4>
+            <div class="value">${synthesis.topJournals.join(', ')}</div>
+          </div>
+          ` : ''}
+          ${synthesis.prolificAuthors.length > 0 ? `
+          <div class="insight-card">
+            <h4>Active Researchers</h4>
+            <div class="value">${synthesis.prolificAuthors.join(', ')}</div>
+          </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderResults(results, total, analysis) {
+      const resultsEl = document.getElementById('results');
+
+      if (results.length === 0) {
+        resultsEl.innerHTML = '<div class="no-results">No results found for your query. Try different search terms.</div>';
+        return;
+      }
+
+      const currentSort = document.getElementById('sortOrder').value;
+      let html = `
+        <div class="results-header">
+          <div class="results-title-row">
+            <h2>Articles</h2>
+            <span class="results-count">${total.toLocaleString()} found</span>
+          </div>
+          <div class="results-controls">
+            <label>Sort:</label>
+            <select id="resultsSortOrder" onchange="changeSortOrder(this.value)">
+              <option value="relevance" ${currentSort === 'relevance' ? 'selected' : ''}>Relevance</option>
+              <option value="recent" ${currentSort === 'recent' ? 'selected' : ''}>Most Recent</option>
+            </select>
+          </div>
+        </div>
+      `;
+
+      // Extract concepts for tagging
+      const allConcepts = extractConcepts(results);
+
+      results.forEach((article, idx) => {
+        html += renderArticleCard(article, idx + 1, allConcepts);
+      });
+
+      resultsEl.innerHTML = html;
+
+      // Fetch AI summaries for top articles (async, non-blocking)
+      setTimeout(() => fetchAISummaries(), 100);
+    }
+
+    function renderArticleCard(article, rank, allConcepts) {
+      const authors = formatAuthors(article.authors);
+      const summary = generateSummary(article.abstract);
+      const date = formatDate(article.date);
+      const url = article.url || `https://doi.org/${article.doi}`;
+
+      // Find concepts in this article
+      const articleText = ((article.title || '') + ' ' + (article.abstract || '')).toLowerCase();
+      const articleConcepts = allConcepts.filter(c => articleText.includes(c)).slice(0, 4);
+
+      // Overlap indicator
+      const isHighRelevance = article.overlapCount && article.overlapCount > 1;
+      const relevanceClass = isHighRelevance ? 'relevant-high' : '';
+      const matchBadge = isHighRelevance
+        ? `<span class="match-badge" title="Found in: ${article.sources?.join(', ')}">${article.overlapCount}× match</span>`
+        : '';
+
+      return `
+        <div class="article-card ${relevanceClass}">
+          <span class="article-rank">#${rank}</span>
+          ${matchBadge}
+          <h3 class="article-title">
+            <a href="${url}" target="_blank">${article.title || 'Untitled'}</a>
+          </h3>
+          <div class="article-meta">
+            <span class="journal-badge">${article.journal || 'Journal'}</span>
+            <span class="article-meta-item">${date}</span>
+            ${article.volume ? `<span class="article-meta-item">Vol. ${article.volume}${article.issue ? `(${article.issue})` : ''}</span>` : ''}
+          </div>
+          <div class="article-authors">${authors}</div>
+          <div class="article-summary" data-doi="${article.doi}" data-title="${encodeURIComponent(article.title || '')}" data-abstract="${encodeURIComponent(article.abstract || '')}">
+            <span class="summary-text">${summary}</span>
+          </div>
+          ${articleConcepts.length > 0 ? `
+          <div class="article-concepts">
+            ${articleConcepts.map(c => `<span class="concept-tag">${c}</span>`).join('')}
+          </div>
+          ` : ''}
+          <div class="article-doi">
+            <strong>DOI:</strong> <a href="https://doi.org/${article.doi}" target="_blank">${article.doi}</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function formatAuthors(authors) {
+      if (!authors || authors.length === 0) return 'Unknown authors';
+      if (authors.length === 1) return authors[0];
+      if (authors.length === 2) return authors.join(' and ');
+      if (authors.length <= 4) return authors.slice(0, -1).join(', ') + ', and ' + authors[authors.length - 1];
+      return authors.slice(0, 3).join(', ') + ' et al.';
+    }
+
+    function generateSummary(abstract) {
+      if (!abstract) return 'No summary available.';
+      const plainText = abstract.replace(/<[^>]*>/g, '');
+      const sentences = plainText.match(/[^.!?]+[.!?]+/g) || [plainText];
+      // Just use the first sentence - no truncation with ellipsis
+      let summary = sentences[0] || plainText;
+      // If first sentence is very short, add second
+      if (summary.length < 80 && sentences.length > 1) {
+        summary += ' ' + sentences[1];
+      }
+      return summary.trim();
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return 'Unknown date';
+      const date = new Date(dateStr);
+      if (isNaN(date)) return dateStr;
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    // ============================================
+    // AI SUMMARIES
+    // ============================================
+    async function fetchAISummaries() {
+      const useAI = document.getElementById('useAI').checked;
+      if (!useAI) return; // Only fetch AI summaries if AI is enabled
+
+      const summaryElements = document.querySelectorAll('.article-summary[data-doi]');
+
+      // Fetch summaries for first 5 articles to reduce API calls
+      const toFetch = Array.from(summaryElements).slice(0, 5);
+
+      for (const el of toFetch) {
+        const title = decodeURIComponent(el.dataset.title || '');
+        const abstract = decodeURIComponent(el.dataset.abstract || '');
+
+        if (!abstract) continue;
+
+        // Add loading state
+        el.classList.add('summary-loading');
+
+        try {
+          const response = await fetch(WORKER_URL + '/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, abstract })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.summary && data.aiGenerated) {
+              const summaryText = el.querySelector('.summary-text');
+              if (summaryText) {
+                summaryText.textContent = data.summary;
+                el.classList.add('ai-generated');
+                // Add AI badge
+                const badge = document.createElement('span');
+                badge.className = 'ai-summary-badge';
+                badge.textContent = 'AI';
+                el.appendChild(badge);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch AI summary:', err);
+        } finally {
+          el.classList.remove('summary-loading');
+        }
+      }
+    }
+  </script>
+</body>
+</html>

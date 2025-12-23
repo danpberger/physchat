@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.wrangler/
+
+# Environment and secrets
+.env
+.env.local
+.dev.vars
+wrangler.toml
+
+# Tokens and credentials
+tokens.json
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+OAUTH_ACCESS_REQUEST.txt
+.claude/

@@ -1,0 +1,447 @@
+/* PhysChat Sidebar Styles - APS Branding */
+
+:root {
+  --physchat-primary: #00274c;
+  --physchat-primary-dark: #001a33;
+  --physchat-accent: #0077b6;
+  --physchat-accent-light: #00a8e8;
+  --physchat-white: #ffffff;
+  --physchat-gray-light: #f5f7fa;
+  --physchat-gray: #e1e5eb;
+  --physchat-gray-dark: #6c757d;
+  --physchat-text: #212529;
+  --physchat-text-muted: #6c757d;
+  --physchat-shadow: rgba(0, 39, 76, 0.15);
+  --physchat-sidebar-width: 380px;
+  --physchat-tab-width: 32px;
+}
+
+/* Sidebar Container */
+#physchat-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: var(--physchat-sidebar-width);
+  height: 100vh;
+  background: var(--physchat-white);
+  box-shadow: -4px 0 20px var(--physchat-shadow);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  transition: transform 0.3s ease;
+  transform: translateX(0);
+}
+
+#physchat-sidebar.collapsed {
+  transform: translateX(var(--physchat-sidebar-width));
+}
+
+/* Toggle Tab */
+#physchat-toggle-tab {
+  position: fixed;
+  top: 50%;
+  right: var(--physchat-sidebar-width);
+  transform: translateY(-50%);
+  width: var(--physchat-tab-width);
+  height: 80px;
+  background: var(--physchat-primary);
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999998;
+  transition: right 0.3s ease, background 0.2s ease;
+  box-shadow: -2px 0 10px var(--physchat-shadow);
+}
+
+#physchat-toggle-tab:hover {
+  background: var(--physchat-accent);
+}
+
+#physchat-sidebar.collapsed + #physchat-toggle-tab,
+#physchat-toggle-tab.sidebar-collapsed {
+  right: 0;
+}
+
+#physchat-toggle-tab svg {
+  width: 20px;
+  height: 20px;
+  fill: var(--physchat-white);
+  transition: transform 0.3s ease;
+}
+
+#physchat-sidebar.collapsed + #physchat-toggle-tab svg,
+#physchat-toggle-tab.sidebar-collapsed svg {
+  transform: rotate(180deg);
+}
+
+/* Header */
+#physchat-header {
+  background: var(--physchat-primary);
+  color: var(--physchat-white);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+#physchat-header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#physchat-header h1 svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+#physchat-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--physchat-white);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+#physchat-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+#physchat-close-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* Auth Banner */
+#physchat-auth-banner {
+  background: var(--physchat-accent);
+  color: var(--physchat-white);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+#physchat-auth-banner.hidden {
+  display: none;
+}
+
+#physchat-auth-banner p {
+  margin: 0;
+  font-size: 14px;
+}
+
+#physchat-login-btn {
+  background: var(--physchat-white);
+  color: var(--physchat-accent);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+#physchat-login-btn:hover {
+  background: var(--physchat-gray-light);
+}
+
+#physchat-login-btn:active {
+  transform: scale(0.98);
+}
+
+/* Search Container */
+#physchat-search-container {
+  padding: 16px 20px;
+  background: var(--physchat-gray-light);
+  border-bottom: 1px solid var(--physchat-gray);
+  flex-shrink: 0;
+}
+
+#physchat-search-form {
+  display: flex;
+  gap: 8px;
+}
+
+#physchat-search-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid var(--physchat-gray);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#physchat-search-input:focus {
+  border-color: var(--physchat-accent);
+  box-shadow: 0 0 0 3px rgba(0, 119, 182, 0.1);
+}
+
+#physchat-search-input::placeholder {
+  color: var(--physchat-gray-dark);
+}
+
+#physchat-search-btn {
+  background: var(--physchat-primary);
+  color: var(--physchat-white);
+  border: none;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+#physchat-search-btn:hover {
+  background: var(--physchat-accent);
+}
+
+#physchat-search-btn:active {
+  transform: scale(0.98);
+}
+
+#physchat-search-btn:disabled {
+  background: var(--physchat-gray-dark);
+  cursor: not-allowed;
+}
+
+#physchat-search-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* Results Container */
+#physchat-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/* Loading State */
+#physchat-loading {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--physchat-text-muted);
+}
+
+#physchat-loading.visible {
+  display: flex;
+}
+
+.physchat-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--physchat-gray);
+  border-top-color: var(--physchat-accent);
+  border-radius: 50%;
+  animation: physchat-spin 0.8s linear infinite;
+}
+
+@keyframes physchat-spin {
+  to { transform: rotate(360deg); }
+}
+
+#physchat-loading p {
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+/* Empty State */
+#physchat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--physchat-text-muted);
+}
+
+#physchat-empty svg {
+  width: 64px;
+  height: 64px;
+  fill: var(--physchat-gray);
+  margin-bottom: 16px;
+}
+
+#physchat-empty h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: var(--physchat-text);
+}
+
+#physchat-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Result Card */
+.physchat-result-card {
+  background: var(--physchat-white);
+  border: 1px solid var(--physchat-gray);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.physchat-result-card:hover {
+  border-color: var(--physchat-accent);
+  box-shadow: 0 2px 8px var(--physchat-shadow);
+}
+
+.physchat-result-card:last-child {
+  margin-bottom: 0;
+}
+
+.physchat-result-title {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.physchat-result-title a {
+  color: var(--physchat-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.physchat-result-title a:hover {
+  color: var(--physchat-accent);
+  text-decoration: underline;
+}
+
+.physchat-result-authors {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: var(--physchat-text-muted);
+  line-height: 1.4;
+}
+
+.physchat-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.physchat-result-badge {
+  background: var(--physchat-gray-light);
+  color: var(--physchat-text-muted);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.physchat-result-badge.journal {
+  background: var(--physchat-primary);
+  color: var(--physchat-white);
+}
+
+.physchat-result-summary {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--physchat-text);
+  line-height: 1.5;
+}
+
+.physchat-result-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--physchat-accent);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.physchat-result-link:hover {
+  color: var(--physchat-accent-light);
+  text-decoration: underline;
+}
+
+.physchat-result-link svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* Results Count */
+#physchat-results-count {
+  font-size: 13px;
+  color: var(--physchat-text-muted);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--physchat-gray);
+}
+
+/* Error State */
+#physchat-error {
+  display: none;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+#physchat-error.visible {
+  display: block;
+}
+
+/* Scrollbar Styling */
+#physchat-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+#physchat-results::-webkit-scrollbar-track {
+  background: var(--physchat-gray-light);
+}
+
+#physchat-results::-webkit-scrollbar-thumb {
+  background: var(--physchat-gray);
+  border-radius: 4px;
+}
+
+#physchat-results::-webkit-scrollbar-thumb:hover {
+  background: var(--physchat-gray-dark);
+}
+
+/* Responsive adjustments for smaller viewports */
+@media (max-width: 480px) {
+  :root {
+    --physchat-sidebar-width: 100vw;
+  }
+
+  #physchat-toggle-tab {
+    display: none;
+  }
+}
