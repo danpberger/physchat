@@ -855,6 +855,10 @@
     // ============================================
     // INITIALIZATION
     // ============================================
+    // Auto-load devToken from config.local.js if present
+    if (typeof PHYSCHAT_CONFIG !== 'undefined' && PHYSCHAT_CONFIG.devToken) {
+      document.getElementById('token').value = PHYSCHAT_CONFIG.devToken;
+    }
     document.getElementById('tokenLen').textContent = document.getElementById('token').value.trim().length;
     document.getElementById('token').addEventListener('input', function() {
       document.getElementById('tokenLen').textContent = this.value.trim().length;

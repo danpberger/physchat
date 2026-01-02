@@ -35,3 +35,4 @@ build/
 npm-debug.log*
 OAUTH_ACCESS_REQUEST.txt
 .claude/
+.playwright-mcp/
