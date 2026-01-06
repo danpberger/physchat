@@ -14,6 +14,8 @@
   --physchat-shadow: rgba(0, 39, 76, 0.15);
   --physchat-sidebar-width: 380px;
   --physchat-tab-width: 32px;
+  --physchat-ai-gradient: linear-gradient(135deg, #8b5cf6, #6366f1);
+  --physchat-success: #22c55e;
 }
 
 /* Sidebar Container */
@@ -81,7 +83,7 @@
 #physchat-header {
   background: var(--physchat-primary);
   color: var(--physchat-white);
-  padding: 16px 20px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -94,12 +96,12 @@
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 #physchat-header h1 svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   fill: currentColor;
 }
 
@@ -130,7 +132,7 @@
 #physchat-auth-banner {
   background: var(--physchat-accent);
   color: var(--physchat-white);
-  padding: 12px 20px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -143,16 +145,16 @@
 
 #physchat-auth-banner p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 #physchat-login-btn {
   background: var(--physchat-white);
   color: var(--physchat-accent);
   border: none;
-  padding: 8px 16px;
+  padding: 6px 14px;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.1s ease;
@@ -168,7 +170,7 @@
 
 /* Search Container */
 #physchat-search-container {
-  padding: 16px 20px;
+  padding: 12px 16px;
   background: var(--physchat-gray-light);
   border-bottom: 1px solid var(--physchat-gray);
   flex-shrink: 0;
@@ -177,11 +179,12 @@
 #physchat-search-form {
   display: flex;
   gap: 8px;
+  margin-bottom: 10px;
 }
 
 #physchat-search-input {
   flex: 1;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border: 2px solid var(--physchat-gray);
   border-radius: 8px;
   font-size: 14px;
@@ -202,7 +205,7 @@
   background: var(--physchat-primary);
   color: var(--physchat-white);
   border: none;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -225,16 +228,286 @@
 }
 
 #physchat-search-btn svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   fill: currentColor;
 }
+
+/* Search Options Row */
+.physchat-search-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.physchat-sort-select {
+  padding: 6px 10px;
+  border: 1px solid var(--physchat-gray);
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--physchat-white);
+  cursor: pointer;
+}
+
+.physchat-sort-select:focus {
+  outline: none;
+  border-color: var(--physchat-accent);
+}
+
+/* AI Toggle */
+.physchat-ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--physchat-text-muted);
+  cursor: pointer;
+}
+
+.physchat-ai-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.physchat-ai-badge {
+  background: var(--physchat-ai-gradient);
+  color: white;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.physchat-ai-toggle:has(input:not(:checked)) .physchat-ai-badge {
+  background: #ccc;
+}
+
+/* Thinking Panel */
+#physchat-thinking-panel {
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  flex-shrink: 0;
+  display: none;
+  max-height: 200px;
+  overflow: hidden;
+}
+
+#physchat-thinking-panel.visible {
+  display: block;
+}
+
+.physchat-thinking-header {
+  background: #1e293b;
+  padding: 6px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.physchat-thinking-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.physchat-thinking-title h3 {
+  margin: 0;
+  font-size: 12px;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.physchat-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #475569;
+}
+
+.physchat-status-indicator.active {
+  background: #22c55e;
+  animation: physchat-pulse 1.5s infinite;
+}
+
+.physchat-status-indicator.complete {
+  background: #3b82f6;
+}
+
+.physchat-status-indicator.error {
+  background: #ef4444;
+}
+
+@keyframes physchat-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+
+.physchat-thinking-toggle {
+  background: transparent;
+  border: 1px solid #475569;
+  color: #94a3b8;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.physchat-thinking-toggle:hover {
+  border-color: #64748b;
+  color: #e2e8f0;
+  background: #334155;
+}
+
+.physchat-thinking-content {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+.physchat-thinking-content.collapsed {
+  display: none;
+}
+
+.physchat-thinking-content .log-line {
+  margin-bottom: 2px;
+  word-wrap: break-word;
+}
+
+.physchat-thinking-content .label {
+  color: #64748b;
+}
+
+.physchat-thinking-content .value {
+  color: #e2e8f0;
+}
+
+.physchat-thinking-content .highlight {
+  color: #fbbf24;
+}
+
+.physchat-thinking-content .success {
+  color: #22c55e;
+}
+
+.physchat-thinking-content .info {
+  color: #60a5fa;
+}
+
+.physchat-thinking-content .concept {
+  background: #1e3a5f;
+  color: #7dd3fc;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  margin-right: 3px;
+}
+
+/* Synthesis Panel - Compact single line */
+#physchat-synthesis-panel {
+  background: linear-gradient(135deg, var(--physchat-primary) 0%, #003366 100%);
+  color: white;
+  flex-shrink: 0;
+  display: none;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+#physchat-synthesis-panel.visible {
+  display: block;
+}
+
+/* AI Answer synthesis */
+.physchat-synthesis-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.physchat-synthesis-text {
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.physchat-synthesis-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  opacity: 0.85;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+}
+
+.physchat-synthesis-badge {
+  background: rgba(255,255,255,0.2);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Reference links in synthesis */
+.physchat-ref-link {
+  color: #7dd3fc;
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.physchat-ref-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+/* Fallback stats display */
+.physchat-synthesis-stat {
+  opacity: 0.9;
+}
+
+.physchat-synthesis-stat strong {
+  font-weight: 600;
+}
+
+.physchat-synthesis-divider {
+  opacity: 0.4;
+  margin: 0 4px;
+}
+
 
 /* Results Container */
 #physchat-results {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 12px 16px;
+}
+
+/* Results Header */
+.physchat-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--physchat-gray);
+}
+
+.physchat-results-header h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--physchat-primary);
+}
+
+.physchat-results-count {
+  font-size: 11px;
+  color: var(--physchat-text-muted);
 }
 
 /* Loading State */
@@ -252,8 +525,8 @@
 }
 
 .physchat-spinner {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border: 3px solid var(--physchat-gray);
   border-top-color: var(--physchat-accent);
   border-radius: 50%;
@@ -265,8 +538,8 @@
 }
 
 #physchat-loading p {
-  margin-top: 16px;
-  font-size: 14px;
+  margin-top: 12px;
+  font-size: 13px;
 }
 
 /* Empty State */
@@ -275,53 +548,90 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 30px 20px;
   text-align: center;
   color: var(--physchat-text-muted);
 }
 
 #physchat-empty svg {
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   fill: var(--physchat-gray);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 #physchat-empty h3 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
+  margin: 0 0 6px 0;
+  font-size: 14px;
   color: var(--physchat-text);
 }
 
 #physchat-empty p {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* Result Card */
 .physchat-result-card {
   background: var(--physchat-white);
   border: 1px solid var(--physchat-gray);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
+  border-left: 3px solid var(--physchat-primary);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
 }
 
 .physchat-result-card:hover {
-  border-color: var(--physchat-accent);
   box-shadow: 0 2px 8px var(--physchat-shadow);
+}
+
+.physchat-result-card.relevant-high {
+  border-left-color: var(--physchat-success);
+}
+
+.physchat-result-card.relevant-medium {
+  border-left-color: #f59e0b;
 }
 
 .physchat-result-card:last-child {
   margin-bottom: 0;
 }
 
-.physchat-result-title {
-  margin: 0 0 8px 0;
-  font-size: 15px;
+/* Article Rank Badge */
+.physchat-article-rank {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 9px;
   font-weight: 600;
-  line-height: 1.4;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Match Badge */
+.physchat-match-badge {
+  position: absolute;
+  top: 8px;
+  right: 32px;
+  background: var(--physchat-success);
+  color: white;
+  font-size: 8px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 3px;
+  cursor: help;
+}
+
+.physchat-result-title {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding-right: 45px;
 }
 
 .physchat-result-title a {
@@ -336,25 +646,25 @@
 }
 
 .physchat-result-authors {
-  margin: 0 0 8px 0;
-  font-size: 13px;
+  margin: 0 0 6px 0;
+  font-size: 11px;
   color: var(--physchat-text-muted);
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .physchat-result-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 5px;
+  margin-bottom: 6px;
 }
 
 .physchat-result-badge {
   background: var(--physchat-gray-light);
   color: var(--physchat-text-muted);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
   font-weight: 500;
 }
 
@@ -364,18 +674,55 @@
 }
 
 .physchat-result-summary {
-  margin: 0 0 12px 0;
-  font-size: 13px;
+  margin: 0 0 6px 0;
+  font-size: 11px;
   color: var(--physchat-text);
-  line-height: 1.5;
+  line-height: 1.4;
+  padding: 6px 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  position: relative;
+}
+
+.physchat-result-summary.ai-generated {
+  background: linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 100%);
+  border: 1px solid #e0e7ff;
+}
+
+.physchat-ai-summary-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: var(--physchat-ai-gradient);
+  color: white;
+  font-size: 8px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+/* Concept Tags */
+.physchat-concepts {
+  margin-bottom: 6px;
+}
+
+.physchat-concept-tag {
+  display: inline-block;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  margin-right: 3px;
+  margin-bottom: 2px;
 }
 
 .physchat-result-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   color: var(--physchat-accent);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   text-decoration: none;
   transition: color 0.2s ease;
@@ -387,17 +734,17 @@
 }
 
 .physchat-result-link svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   fill: currentColor;
 }
 
-/* Results Count */
+/* Results Count (old style) */
 #physchat-results-count {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--physchat-text-muted);
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--physchat-gray);
 }
 
@@ -407,10 +754,10 @@
   background: #fee2e2;
   border: 1px solid #fca5a5;
   color: #991b1b;
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
 }
 
 #physchat-error.visible {
@@ -418,21 +765,33 @@
 }
 
 /* Scrollbar Styling */
-#physchat-results::-webkit-scrollbar {
-  width: 8px;
+#physchat-results::-webkit-scrollbar,
+.physchat-thinking-content::-webkit-scrollbar {
+  width: 6px;
 }
 
-#physchat-results::-webkit-scrollbar-track {
+#physchat-results::-webkit-scrollbar-track,
+.physchat-thinking-content::-webkit-scrollbar-track {
   background: var(--physchat-gray-light);
 }
 
-#physchat-results::-webkit-scrollbar-thumb {
+#physchat-results::-webkit-scrollbar-thumb,
+.physchat-thinking-content::-webkit-scrollbar-thumb {
   background: var(--physchat-gray);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
-#physchat-results::-webkit-scrollbar-thumb:hover {
+#physchat-results::-webkit-scrollbar-thumb:hover,
+.physchat-thinking-content::-webkit-scrollbar-thumb:hover {
   background: var(--physchat-gray-dark);
+}
+
+.physchat-thinking-content::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.physchat-thinking-content::-webkit-scrollbar-thumb {
+  background: #475569;
 }
 
 /* Responsive adjustments for smaller viewports */

@@ -8,6 +8,134 @@
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-3-haiku-20240307'; // Fast and cheap for query parsing
 
+// Agent tools definition for agentic search
+const AGENT_TOOLS = [
+  {
+    name: "search_papers",
+    description: "Search the APS physics journal database for papers matching a query. Use this to find papers on specific topics, concepts, or by author.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query - can be keywords, phrases, or author names"
+        },
+        search_type: {
+          type: "string",
+          enum: ["general", "title_focused", "recent"],
+          description: "general: searches all fields; title_focused: prioritizes title matches; recent: filters to papers from last 3 years"
+        },
+        limit: {
+          type: "integer",
+          description: "Number of results to return (default 10, max 20)"
+        }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "analyze_gaps",
+    description: "After searching, analyze what's missing from your results. Call this to identify if you need additional searches to better answer the user's question.",
+    input_schema: {
+      type: "object",
+      properties: {
+        current_coverage: {
+          type: "string",
+          description: "Brief description of what the current results cover"
+        },
+        missing_aspects: {
+          type: "array",
+          items: { type: "string" },
+          description: "List of aspects of the question not yet covered by results"
+        },
+        suggested_queries: {
+          type: "array",
+          items: { type: "string" },
+          description: "Additional search queries that might fill the gaps"
+        }
+      },
+      required: ["current_coverage", "missing_aspects"]
+    }
+  },
+  {
+    name: "finish",
+    description: "Call this when you have gathered enough papers to answer the user's question. This signals you're done searching.",
+    input_schema: {
+      type: "object",
+      properties: {
+        reasoning: {
+          type: "string",
+          description: "Explain why the current papers are sufficient to address the user's question"
+        },
+        coverage_summary: {
+          type: "string",
+          description: "Brief summary of what topics/aspects are covered by the papers found"
+        }
+      },
+      required: ["reasoning"]
+    }
+  }
+];
+
+// Input sanitization for prompt injection protection (POC level)
+const MAX_QUERY_LENGTH = 500;
+
+function sanitizeQuery(input) {
+  if (!input || typeof input !== 'string') return '';
+
+  let sanitized = input;
+
+  // Remove code blocks
+  sanitized = sanitized.replace(/```[\s\S]*?```/g, '');
+  sanitized = sanitized.replace(/`[^`]*`/g, '');
+
+  // Remove HTML/script tags
+  sanitized = sanitized.replace(/<[^>]*>/g, '');
+
+  // Remove common prompt injection patterns
+  const injectionPatterns = [
+    /ignore\s+(previous|above|all)\s+(instructions?|prompts?|rules?)/gi,
+    /disregard\s+(previous|above|all)/gi,
+    /forget\s+(previous|above|everything)/gi,
+    /system\s*:/gi,
+    /assistant\s*:/gi,
+    /user\s*:/gi,
+    /\[INST\]/gi,
+    /\[\/INST\]/gi,
+    /<<SYS>>/gi,
+    /<\/SYS>>/gi,
+    /\{\{.*?\}\}/g,  // Template injection
+    /\$\{.*?\}/g,    // Template literals
+    /<\|.*?\|>/g,    // Special tokens
+    /\[\[.*?\]\]/g,  // Wiki-style injection
+  ];
+
+  for (const pattern of injectionPatterns) {
+    sanitized = sanitized.replace(pattern, '');
+  }
+
+  // Remove URLs
+  sanitized = sanitized.replace(/https?:\/\/[^\s]+/gi, '');
+
+  // Limit length
+  if (sanitized.length > MAX_QUERY_LENGTH) {
+    sanitized = sanitized.substring(0, MAX_QUERY_LENGTH);
+  }
+
+  // Normalize whitespace
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+
+  return sanitized;
+}
+
+// Check if query looks suspicious (for logging)
+function isSuspiciousQuery(original, sanitized) {
+  if (!original || !sanitized) return true;
+  const lengthDiff = original.length - sanitized.length;
+  // If we removed more than 20% of the content, it's suspicious
+  return lengthDiff > original.length * 0.2;
+}
+
 // CORS headers for cross-origin requests
 // Allow multiple origins for development (restrict in production)
 const corsHeaders = {
@@ -377,13 +505,27 @@ async function handleSearch(request, env) {
     });
   }
 
-  const { query, limit = 10, sort = 'relevance' } = body;
+  const { query: rawQuery, limit = 10, sort = 'relevance' } = body;
 
-  if (!query || typeof query !== 'string') {
+  if (!rawQuery || typeof rawQuery !== 'string') {
     return new Response(JSON.stringify({ error: 'Query is required' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // Sanitize query for prompt injection protection
+  const query = sanitizeQuery(rawQuery);
+  if (!query) {
+    return new Response(JSON.stringify({ error: 'Invalid query' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Log suspicious queries for monitoring
+  if (isSuspiciousQuery(rawQuery, query)) {
+    console.warn('Suspicious query detected:', { original: rawQuery.substring(0, 100), sanitized: query.substring(0, 100) });
   }
 
   // Call Tesseract API
@@ -410,23 +552,44 @@ async function handleSearch(request, env) {
 }
 
 /**
- * Call Tesseract MCP search API
+ * Call Tesseract MCP search API - supports advanced search with clauses
+ * @param {Object} searchParams - Can be a string (simple query) or object with advanced options
  */
-async function callTesseractSearch(env, accessToken, query, limit, sort = 'relevance') {
-  // The Tesseract API uses MCP protocol - we need to format the request accordingly
+async function callTesseractSearch(env, accessToken, searchParams, limit, sort = 'relevance') {
+  // Normalize searchParams - can be string or object
+  const params = typeof searchParams === 'string'
+    ? { query: searchParams }
+    : searchParams;
+
+  // Build the search arguments - use mcpSearch for reliability
+  // mcpSearch is simpler and more reliable than searchPost
+  const searchArgs = {
+    q: params.query,
+    per_page: Math.min(limit, 100),
+    sort: sort
+  };
+
+  // Add date range if specified (mcpSearch supports these)
+  if (params.dateRange) {
+    if (params.dateRange.start) {
+      searchArgs.start_date = params.dateRange.start;
+    }
+    if (params.dateRange.end) {
+      searchArgs.end_date = params.dateRange.end;
+    }
+  }
+
   const mcpRequest = {
     jsonrpc: '2.0',
     id: Date.now(),
     method: 'tools/call',
     params: {
       name: 'search-api___mcpSearch',
-      arguments: {
-        q: query,
-        per_page: Math.min(limit, 100),
-        sort: sort // 'relevance' or 'recent'
-      }
+      arguments: searchArgs
     }
   };
+
+  console.log('Tesseract search request:', JSON.stringify(searchArgs));
 
   const response = await fetch(env.TESSERACT_API_URL, {
     method: 'POST',
@@ -438,10 +601,12 @@ async function callTesseractSearch(env, accessToken, query, limit, sort = 'relev
   });
 
   if (!response.ok) {
+    const errorBody = await response.text();
+    console.error('Tesseract API error:', response.status, errorBody);
     if (response.status === 401 || response.status === 403) {
       throw new Error('Unauthorized');
     }
-    throw new Error(`API error: ${response.status}`);
+    throw new Error(`API error: ${response.status} - ${errorBody.substring(0, 200)}`);
   }
 
   const mcpResponse = await response.json();
@@ -523,105 +688,97 @@ async function handleAISearch(request, env) {
     });
   }
 
-  const { query, limit = 15, sort = 'relevance' } = body;
+  const { query: rawQuery, limit = 15, sort = 'relevance' } = body;
 
-  if (!query || typeof query !== 'string') {
+  if (!rawQuery || typeof rawQuery !== 'string') {
     return new Response(JSON.stringify({ error: 'Query is required' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
+  // Sanitize query for prompt injection protection
+  const query = sanitizeQuery(rawQuery);
+  if (!query) {
+    return new Response(JSON.stringify({ error: 'Invalid query' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Log suspicious queries for monitoring
+  if (isSuspiciousQuery(rawQuery, query)) {
+    console.warn('Suspicious AI query detected:', { original: rawQuery.substring(0, 100), sanitized: query.substring(0, 100) });
+  }
+
   try {
-    // Step 1: Use Claude to parse the query and generate search strategy
-    const searchPlan = await parseQueryWithClaude(env, query);
+    // Use agentic search - Claude decides what to search and when to stop
+    const agentResult = await executeAgenticSearch(env, accessToken, query, 4);
 
-    // Step 2: Execute multiple searches based on Claude's plan
-    const allResults = new Map(); // DOI -> { article, sources, weight }
-    const searchDetails = []; // Track details of each search for transparency
-
-    for (const search of searchPlan.searches) {
-      try {
-        const results = await callTesseractSearch(
-          env,
-          accessToken,
-          search.query,
-          limit,
-          sort
-        );
-
-        // Track search details
-        searchDetails.push({
-          query: search.query,
-          purpose: search.purpose,
-          weight: search.weight,
-          totalFound: results.total,
-          retrieved: results.results.length
-        });
-
-        // Track results with their source and weight
-        for (let i = 0; i < results.results.length; i++) {
-          const article = results.results[i];
-          if (!article.doi) continue;
-
-          const rankWeight = search.weight * (1 - i * 0.02);
-
-          if (allResults.has(article.doi)) {
-            const existing = allResults.get(article.doi);
-            existing.sources.push(search.purpose);
-            existing.weight += rankWeight;
-            existing.overlapCount++;
-          } else {
-            allResults.set(article.doi, {
-              article,
-              sources: [search.purpose],
-              weight: rankWeight,
-              overlapCount: 1
-            });
-          }
-        }
-      } catch (searchError) {
-        console.error(`Search failed for "${search.query}":`, searchError);
-        searchDetails.push({
-          query: search.query,
-          purpose: search.purpose,
-          weight: search.weight,
-          error: searchError.message
-        });
-      }
+    // If agent failed, fall back to simple search
+    if (!agentResult.success) {
+      console.log('Agent failed, falling back to simple search:', agentResult.fallbackReason);
+      const fallbackResults = await callTesseractSearch(env, accessToken, query, limit, sort);
+      return new Response(JSON.stringify({
+        query: query,
+        aiAnalysis: null,
+        fallback: true,
+        fallbackReason: agentResult.fallbackReason,
+        ...fallbackResults
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // Step 3: Score and rank results
-    const scoredResults = [...allResults.values()]
-      .map(r => ({
-        ...r.article,
-        sources: r.sources,
-        overlapCount: r.overlapCount,
-        relevanceScore: r.weight + (r.overlapCount - 1) * 1.5
-      }))
-      .sort((a, b) => b.relevanceScore - a.relevanceScore)
-      .slice(0, 20);
+    // Agent succeeded - process results
+    const papers = agentResult.papers;
 
-    // Calculate overlap statistics
-    const overlapStats = {
-      totalUnique: allResults.size,
-      inMultipleSearches: [...allResults.values()].filter(r => r.overlapCount > 1).length,
-      in3PlusSearches: [...allResults.values()].filter(r => r.overlapCount >= 3).length,
-      maxOverlap: Math.max(...[...allResults.values()].map(r => r.overlapCount), 0)
-    };
+    // Score papers - papers found in multiple searches (if agent searched multiple times) rank higher
+    // For now, simple ordering based on when they were found (earlier = more relevant)
+    const scoredResults = papers.slice(0, 20);
 
-    // Return results with detailed AI analysis metadata
+    // Determine intent from agent steps for synthesis
+    const hasRecentSearch = agentResult.agentSteps.some(s => s.type === 'search' && s.searchType === 'recent');
+    const intent = hasRecentSearch ? 'survey' : 'specific';
+
+    // Generate answer synthesis from top results
+    let synthesis = null;
+    if (scoredResults.length > 0 && env.ANTHROPIC_API_KEY) {
+      synthesis = await generateAnswerSynthesis(env, query, intent, scoredResults.slice(0, 5));
+    }
+
+    // Extract search details from agent steps for the thinking panel
+    const searchSteps = agentResult.agentSteps.filter(s => s.type === 'search');
+    const analysisSteps = agentResult.agentSteps.filter(s => s.type === 'analysis');
+    const finishStep = agentResult.agentSteps.find(s => s.type === 'finish');
+
+    // Return results with agent reasoning
     return new Response(JSON.stringify({
       query: query,
       aiAnalysis: {
-        interpretation: searchPlan.interpretation,
-        concepts: searchPlan.concepts,
-        searchesRun: searchDetails
+        mode: 'agentic',
+        interpretation: finishStep?.coverage || `Agent searched for: ${query}`,
+        intent: intent,
+        concepts: [], // Agent doesn't explicitly list concepts
+        agentSteps: agentResult.agentSteps,
+        searchesRun: searchSteps.map(s => ({
+          query: s.query,
+          searchType: s.searchType,
+          totalFound: s.totalFound,
+          newPapers: s.newPapers,
+          status: s.status,
+          error: s.error
+        })),
+        synthesis: synthesis,
+        finishReason: agentResult.finishReason
       },
       ranking: {
-        method: 'overlap_weighted',
-        overlapBonus: 1.5,
-        stats: overlapStats
+        method: 'agent_curated',
+        totalSearches: agentResult.totalSearches,
+        stats: {
+          totalUnique: papers.length,
+          agentIterations: Math.max(...agentResult.agentSteps.map(s => s.iteration || 0), 0)
+        }
       },
       total: scoredResults.length,
       results: scoredResults
@@ -670,33 +827,52 @@ async function parseQueryWithClaude(env, query) {
     return fallbackQueryParsing(query);
   }
 
-  const systemPrompt = `You are a physics research search assistant. Your job is to analyze user queries and generate effective search strategies for a physics article database (APS journals).
+  const systemPrompt = `You are a physics research search assistant for APS journals. Analyze the user's query to understand their INTENT and generate an optimal search strategy.
 
-CRITICAL: Extract only SPECIFIC physics concepts. NEVER include generic words like:
-- "effect", "effects", "affect", "cause", "impact", "influence", "role"
-- "relationship", "connection", "interaction" (unless physics-specific)
-- "study", "research", "paper", "work", "result"
+## Intent Types
+Identify ONE primary intent:
+- **explainer**: User wants to understand a concept ("What is...", "How does...work", "Explain...")
+  → Prioritize review articles, foundational papers, highly-cited works
+- **survey**: User wants current state of field ("Recent advances in...", "Latest research on...")
+  → Filter to recent years (2022+), sort by date
+- **specific**: User wants papers on a specific phenomenon or result
+  → Precise keyword matching, use title field
+- **author**: User mentions a researcher name
+  → Use author field search
+- **comparative**: User comparing concepts ("difference between X and Y", "X vs Y")
+  → Search each concept, look for papers discussing both
 
-Given a user's question, you must:
-1. Identify the SPECIFIC physics concepts (e.g., "gravity", "biology", "quantum entanglement")
-2. Preserve compound physics terms (e.g., "quantum mechanics", "dark matter", "gravitational waves")
-3. Generate 2-4 focused search queries using ONLY the specific concepts
-4. For relationship questions, search for the intersection of concepts
+## Search Strategy
+Generate 2-4 searches. Each search can specify:
+- **query**: The search terms
+- **fields**: Array of ["title", "abstract", "author"] - where to search (default: all)
+- **dateRange**: Object {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"} or null
+- **articleTypes**: Array like ["review", "research"] or null (review = review articles, research = original research)
+- **weight**: 1.0-2.5 importance
 
-Example: "What effect does gravity have on biology?"
-- Good concepts: ["gravity", "biology"] or ["gravitational effects biology"]
-- Bad concepts: ["effect", "gravity", "biology"] - "effect" is too generic!
+## Rules
+- Extract SPECIFIC physics terms, not generic words (effect, cause, relationship, study)
+- Preserve compound terms: "quantum entanglement", "dark matter", "Bose-Einstein condensate"
+- For explainer intent: include a search for review articles
+- For survey intent: always set dateRange.start to at least 2022
+- For author queries: put the name in a separate author-field search
 
-Respond ONLY with valid JSON:
+Respond with valid JSON only:
 {
-  "interpretation": "Brief summary of what user wants",
-  "concepts": ["specific_concept1", "specific_concept2"],
+  "interpretation": "One sentence summary of what user wants to learn",
+  "intent": "explainer|survey|specific|author|comparative",
+  "concepts": ["concept1", "concept2"],
   "searches": [
-    {"query": "search terms", "purpose": "brief label", "weight": 1.0-2.0}
+    {
+      "query": "search terms",
+      "fields": ["title", "abstract"],
+      "dateRange": null,
+      "articleTypes": null,
+      "purpose": "brief label",
+      "weight": 1.5
+    }
   ]
-}
-
-Weight: 2.0 for intersection searches, 1.5 for primary concepts, 1.0-1.2 for supporting.`;
+}`;
 
   const userPrompt = `Generate a search strategy for this query: "${query}"`;
 
@@ -749,9 +925,13 @@ Weight: 2.0 for intersection searches, 1.5 for primary concepts, 1.0-1.2 for sup
 
     return {
       interpretation: parsed.interpretation || 'Searching for: ' + query,
+      intent: parsed.intent || 'specific',
       concepts: parsed.concepts || [],
       searches: parsed.searches.slice(0, 4).map(s => ({
         query: s.query || query,
+        fields: s.fields || null,
+        dateRange: s.dateRange || null,
+        articleTypes: s.articleTypes || null,
         purpose: s.purpose || 'search',
         weight: Math.min(Math.max(s.weight || 1.0, 0.5), 2.5)
       }))
@@ -761,6 +941,332 @@ Weight: 2.0 for intersection searches, 1.5 for primary concepts, 1.0-1.2 for sup
     console.error('Error calling Claude:', error);
     return fallbackQueryParsing(query);
   }
+}
+
+/**
+ * Generate a synthesized answer from search results
+ * CRITICAL: Only uses information from the provided abstracts, never from training data
+ */
+async function generateAnswerSynthesis(env, query, intent, topResults) {
+  if (!env.ANTHROPIC_API_KEY || topResults.length === 0) {
+    return null;
+  }
+
+  // Build context from top results - strip any HTML/MathML from titles
+  const paperSummaries = topResults.map((paper, idx) => {
+    const cleanTitle = (paper.title || 'Untitled')
+      .replace(/<math[^>]*>[\s\S]*?<\/math>/gi, '')
+      .replace(/<[^>]+>/g, '')
+      .trim();
+    const abstract = paper.abstract
+      ? paper.abstract.substring(0, 600) + (paper.abstract.length > 600 ? '...' : '')
+      : 'No abstract available';
+    return `[${idx + 1}] "${cleanTitle}" (${paper.journal || 'Unknown'}, ${paper.date ? new Date(paper.date).getFullYear() : 'n.d.'})\nAbstract: ${abstract}`;
+  }).join('\n\n');
+
+  const intentGuidance = {
+    'explainer': 'Explain the concept using ONLY what is stated in these abstracts.',
+    'survey': 'Summarize the research findings from ONLY these papers.',
+    'specific': 'Describe ONLY what these specific papers found.',
+    'author': 'Summarize ONLY the research shown in these papers.',
+    'comparative': 'Compare concepts using ONLY information from these abstracts.'
+  };
+
+  const systemPrompt = `You are a research assistant that synthesizes information EXCLUSIVELY from provided paper abstracts.
+
+CRITICAL RULES:
+1. ONLY use information explicitly stated in the abstracts below
+2. NEVER add information from your training data or general knowledge
+3. If the abstracts don't contain enough information to answer, say "Based on these papers, [what they do cover]"
+4. Every claim must be supported by a citation [1], [2], etc.
+5. Keep your answer to 2-3 sentences maximum
+6. ${intentGuidance[intent] || intentGuidance['specific']}
+
+If you cannot answer the question from the abstracts alone, summarize what the papers DO cover instead of making things up.`;
+
+  const userPrompt = `Question: "${query}"
+
+PAPER ABSTRACTS (use ONLY this information):
+${paperSummaries}
+
+Write a 2-3 sentence synthesis using ONLY the information above. Cite with [1], [2], etc.:`;
+
+  try {
+    const response = await fetch(CLAUDE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 300,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Synthesis API error:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const synthesis = data.content?.[0]?.text?.trim();
+
+    return synthesis || null;
+
+  } catch (error) {
+    console.error('Error generating synthesis:', error);
+    return null;
+  }
+}
+
+/**
+ * Execute agentic search - Claude decides what to search and when it has enough results
+ * Returns collected papers and agent reasoning steps
+ */
+async function executeAgenticSearch(env, accessToken, userQuery, maxIterations = 4) {
+  // Check if API key is configured
+  if (!env.ANTHROPIC_API_KEY) {
+    console.log('ANTHROPIC_API_KEY not configured, falling back to simple search');
+    return {
+      success: false,
+      fallbackReason: 'API key not configured',
+      papers: [],
+      agentSteps: []
+    };
+  }
+
+  const systemPrompt = `You are a physics research search agent helping find relevant papers from APS journals.
+
+Your goal: Find papers that best answer the user's question.
+
+WORKFLOW:
+1. Analyze the user's question to understand what they're looking for
+2. Use search_papers to find relevant papers (you can search multiple times with different queries)
+3. After each search, evaluate if you have enough coverage
+4. Use analyze_gaps if you think more searches would help
+5. Call finish when you have sufficient papers to answer the question
+
+SEARCH STRATEGIES:
+- For conceptual questions ("What is X?"): Search for the concept + "review" or foundational terms
+- For recent research ("Latest on X"): Use search_type="recent"
+- For specific phenomena: Use precise technical terms
+- For comparisons ("X vs Y"): Search each concept separately
+
+TIPS:
+- Physics terms are specific: "topological insulator" not just "insulator"
+- Try synonyms if first search is poor: "BEC" vs "Bose-Einstein condensate"
+- 2-3 good searches usually suffice; don't over-search
+
+Call finish when you have 5-15 relevant papers covering the main aspects of the question.`;
+
+  // Initialize conversation
+  let messages = [
+    { role: 'user', content: `Find papers to answer this question: "${userQuery}"` }
+  ];
+
+  const allPapers = new Map(); // DOI -> paper (deduped)
+  const agentSteps = []; // Track agent's reasoning for transparency
+  let finished = false;
+  let finishReason = null;
+
+  for (let iteration = 0; iteration < maxIterations && !finished; iteration++) {
+    try {
+      // Call Claude with tools
+      const response = await fetch(CLAUDE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: 1024,
+          system: systemPrompt,
+          tools: AGENT_TOOLS,
+          messages: messages
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Agent API error:', response.status, errorText);
+        break;
+      }
+
+      const data = await response.json();
+
+      // Check stop reason
+      if (data.stop_reason === 'end_turn') {
+        // Agent finished without calling a tool - extract any text response
+        const textContent = data.content?.find(c => c.type === 'text');
+        if (textContent) {
+          agentSteps.push({
+            type: 'thinking',
+            iteration: iteration + 1,
+            content: textContent.text
+          });
+        }
+        finished = true;
+        finishReason = 'Agent completed reasoning';
+        break;
+      }
+
+      // Process tool calls
+      if (data.stop_reason === 'tool_use') {
+        // Add assistant's response to conversation
+        messages.push({ role: 'assistant', content: data.content });
+
+        // Find tool use blocks
+        const toolUses = data.content.filter(c => c.type === 'tool_use');
+        const toolResults = [];
+
+        for (const toolUse of toolUses) {
+          const toolName = toolUse.name;
+          const toolInput = toolUse.input;
+
+          if (toolName === 'search_papers') {
+            // Execute search
+            const query = toolInput.query;
+            const searchType = toolInput.search_type || 'general';
+            const limit = Math.min(toolInput.limit || 10, 20);
+
+            agentSteps.push({
+              type: 'search',
+              iteration: iteration + 1,
+              query: query,
+              searchType: searchType
+            });
+
+            try {
+              // Build search params based on search type
+              const searchParams = { query };
+              if (searchType === 'recent') {
+                const threeYearsAgo = new Date();
+                threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+                searchParams.dateRange = { start: threeYearsAgo.toISOString().split('T')[0] };
+              }
+
+              const results = await callTesseractSearch(env, accessToken, searchParams, limit, 'relevance');
+
+              // Add to collected papers (dedupe by DOI)
+              let newCount = 0;
+              for (const paper of results.results || []) {
+                if (paper.doi && !allPapers.has(paper.doi)) {
+                  allPapers.set(paper.doi, paper);
+                  newCount++;
+                }
+              }
+
+              // Update step with results
+              const lastStep = agentSteps[agentSteps.length - 1];
+              lastStep.totalFound = results.total;
+              lastStep.newPapers = newCount;
+              lastStep.status = 'success';
+
+              // Build result summary for agent
+              const paperSummaries = (results.results || []).slice(0, 5).map((p, i) => {
+                const cleanTitle = (p.title || 'Untitled')
+                  .replace(/<math[^>]*>[\s\S]*?<\/math>/gi, '')
+                  .replace(/<[^>]+>/g, '')
+                  .substring(0, 100);
+                return `${i + 1}. "${cleanTitle}" (${p.journal || 'Unknown'}, ${p.date ? new Date(p.date).getFullYear() : 'n.d.'})`;
+              }).join('\n');
+
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: toolUse.id,
+                content: `Found ${results.total} papers. Top results:\n${paperSummaries}\n\nTotal unique papers collected so far: ${allPapers.size}`
+              });
+
+            } catch (searchError) {
+              console.error('Agent search error:', searchError.message, searchError.stack);
+              const lastStep = agentSteps[agentSteps.length - 1];
+              lastStep.status = 'error';
+              lastStep.error = searchError.message;
+              lastStep.errorDetail = searchError.stack;
+
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: toolUse.id,
+                content: `Search failed: ${searchError.message}. Try a different query.`,
+                is_error: true
+              });
+            }
+
+          } else if (toolName === 'analyze_gaps') {
+            // Agent is analyzing what's missing
+            agentSteps.push({
+              type: 'analysis',
+              iteration: iteration + 1,
+              coverage: toolInput.current_coverage,
+              gaps: toolInput.missing_aspects,
+              suggestions: toolInput.suggested_queries
+            });
+
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: `Gap analysis recorded. You have ${allPapers.size} papers. ${toolInput.missing_aspects?.length > 0 ? 'Consider searching for: ' + toolInput.suggested_queries?.slice(0, 2).join(', ') : 'Coverage looks good - consider calling finish.'}`
+            });
+
+          } else if (toolName === 'finish') {
+            // Agent is done
+            agentSteps.push({
+              type: 'finish',
+              iteration: iteration + 1,
+              reasoning: toolInput.reasoning,
+              coverage: toolInput.coverage_summary
+            });
+
+            finished = true;
+            finishReason = toolInput.reasoning;
+
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: 'Search complete. Proceeding to synthesis.'
+            });
+          }
+        }
+
+        // Add tool results to conversation
+        if (toolResults.length > 0) {
+          messages.push({ role: 'user', content: toolResults });
+        }
+      }
+
+    } catch (error) {
+      console.error('Agent iteration error:', error);
+      agentSteps.push({
+        type: 'error',
+        iteration: iteration + 1,
+        error: error.message
+      });
+      break;
+    }
+  }
+
+  // If we hit max iterations without finishing, note it
+  if (!finished) {
+    agentSteps.push({
+      type: 'max_iterations',
+      message: `Reached maximum ${maxIterations} iterations`
+    });
+    finishReason = `Reached iteration limit with ${allPapers.size} papers`;
+  }
+
+  return {
+    success: true,
+    papers: [...allPapers.values()],
+    agentSteps: agentSteps,
+    finishReason: finishReason,
+    totalSearches: agentSteps.filter(s => s.type === 'search').length
+  };
 }
 
 /**
@@ -863,6 +1369,7 @@ function fallbackQueryParsing(query) {
 
   return {
     interpretation: `Searching for: ${concepts.join(', ') || query}`,
+    intent: 'specific',  // Default intent for fallback
     concepts: concepts,
     searches: searches.slice(0, 4)
   };
@@ -890,11 +1397,77 @@ async function handleSummarize(request, env) {
     });
   }
 
-  const { title, abstract } = body;
+  const { title, abstract, searchQuery } = body;
 
-  if (!abstract || typeof abstract !== 'string') {
-    return new Response(JSON.stringify({ error: 'Abstract is required' }), {
+  // Allow title-only summarization
+  if (!title && !abstract) {
+    return new Response(JSON.stringify({ error: 'Title or abstract is required' }), {
       status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // If no abstract, generate a brief summary from title using AI
+  if (!abstract || typeof abstract !== 'string' || abstract.trim().length === 0) {
+    if (!env.ANTHROPIC_API_KEY) {
+      return new Response(JSON.stringify({
+        summary: `Research on: ${title}`,
+        aiGenerated: false
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    try {
+      let titlePrompt;
+      if (searchQuery) {
+        titlePrompt = `A user searched for: "${searchQuery}"
+This paper was found: "${title}"
+
+Write ONE brief sentence (under 150 characters) that:
+1. Describes what this paper investigates
+2. Hints at why it's relevant to the search
+
+Don't start with "This paper" - be direct.`;
+      } else {
+        titlePrompt = `Based on this physics paper title, write a single brief sentence (under 150 characters) describing what this research likely investigates. Be specific to physics. Title: "${title}"`;
+      }
+
+      const response = await fetch(CLAUDE_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: 100,
+          messages: [{ role: 'user', content: titlePrompt }]
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const summary = data.content?.[0]?.text?.trim();
+        if (summary) {
+          return new Response(JSON.stringify({
+            summary: summary,
+            aiGenerated: true,
+            fromTitle: true
+          }), {
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Title-only summarize error:', e);
+    }
+
+    return new Response(JSON.stringify({
+      summary: `Research on: ${title}`,
+      aiGenerated: false
+    }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -911,9 +1484,29 @@ async function handleSummarize(request, env) {
   }
 
   try {
-    const systemPrompt = `You are a scientific paper summarizer. Given a paper's title and abstract, generate a single concise sentence (maximum 200 characters) that captures the key finding. Write for physicists. Be direct, factual, and brief. Never use more than one sentence.`;
+    let systemPrompt, userPrompt;
 
-    const userPrompt = `Title: ${title || 'Untitled'}\n\nAbstract: ${abstract}\n\nProvide a single-sentence summary (under 200 characters):`;
+    if (searchQuery) {
+      // Context-aware summary that explains relevance
+      systemPrompt = `You are a research assistant helping a physicist find relevant papers. Given a paper and a search query, write ONE sentence (max 200 chars) that:
+1. Summarizes the paper's key finding
+2. Naturally indicates why it's relevant to what the user is looking for
+
+Don't start with "This paper" or "The authors". Be direct and specific.`;
+
+      userPrompt = `Search query: "${searchQuery}"
+
+Paper title: ${title || 'Untitled'}
+
+Abstract: ${abstract}
+
+Write a single summary sentence (under 200 chars) that captures the finding and its relevance:`;
+    } else {
+      // Standard summary without search context
+      systemPrompt = `You are a scientific paper summarizer. Given a paper's title and abstract, generate a single concise sentence (maximum 200 characters) that captures the key finding. Write for physicists. Be direct, factual, and brief. Never use more than one sentence.`;
+
+      userPrompt = `Title: ${title || 'Untitled'}\n\nAbstract: ${abstract}\n\nProvide a single-sentence summary (under 200 characters):`;
+    }
 
     const response = await fetch(CLAUDE_API_URL, {
       method: 'POST',
