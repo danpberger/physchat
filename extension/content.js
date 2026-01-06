@@ -914,14 +914,13 @@
     }
   }
 
-  // Handle article link click - navigate in same tab, preserving search state
+  // Handle article link click - open in new tab to preserve sidebar context
   function handleArticleClick(event) {
     event.preventDefault();
     const url = event.currentTarget.dataset.url;
     if (url) {
-      // Save search state before navigating
-      saveSearchState();
-      window.location.href = url;
+      // Open in new tab so user keeps their search results
+      window.open(url, '_blank', 'noopener');
     }
   }
 

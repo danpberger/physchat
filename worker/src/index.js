@@ -489,11 +489,6 @@ async function handleSearch(request, env) {
 
   const accessToken = authHeader.substring(7);
 
-  // Debug: Log token info
-  console.log('Token received, length:', accessToken.length);
-  console.log('Token starts with:', accessToken.substring(0, 50));
-  console.log('Token ends with:', accessToken.substring(accessToken.length - 20));
-
   // Parse request body
   let body;
   try {
